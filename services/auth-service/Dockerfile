@@ -1,44 +1,35 @@
 # Stage 1: Build stage
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
 # Copy package files
-COPY package*.json ./
-
 # Install dependencies
-RUN npm ci --only=production
-
 # Stage 2: Runtime stage
-FROM node:18-alpine
-
 # Labels for documentation
-LABEL service="auth-service"
-LABEL description="Auth Service - ENCS 691K Access Control Layer"
-LABEL version="1.0.0"
-
 # Set working directory
+# Copy dependencies from builder stage
+# Copy application code
+# Health check
+# Expose port
+# Set environment variables
+# Run application
+FROM maven:3.9.6-eclipse-temurin-17 AS build
+
 WORKDIR /app
 
-# Copy dependencies from builder stage
-COPY --from=builder /app/node_modules ./node_modules
+COPY pom.xml ./
+COPY src ./src
 
-# Copy application code
-COPY package*.json ./
-COPY index.js ./
+RUN mvn -q -DskipTests package
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3002/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
+FROM eclipse-temurin:17-jre
 
-# Expose port
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/target/*.jar /app/app.jar
+
 EXPOSE 3002
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=3002
-ENV JWT_SECRET=${JWT_SECRET:-demo-secret-key-change-in-production}
-ENV JWT_EXPIRY=24h
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -f http://localhost:3002/health || exit 1
 
-# Run application
-CMD ["node", "index.js"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

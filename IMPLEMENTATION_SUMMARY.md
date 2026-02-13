@@ -11,8 +11,9 @@ This document summarizes the completed implementation of the identity and access
 ### 1. User Service (services/user-service) ✅
 
 **Files Created:**
-- `index.js` - Complete application with 7 REST endpoints (399 lines)
-- `package.json` - Dependencies: express, uuid
+- `pom.xml` - Spring Boot dependencies
+- `src/main/java/...` - Controllers, models, validation
+- `src/main/resources/application.properties`
 - `Dockerfile` - Multi-stage build with health checks
 - `README.md` - Comprehensive API documentation (300+ lines)
 
@@ -25,7 +26,7 @@ This document summarizes the completed implementation of the identity and access
 - ✅ User status tracking (active, selling, bidding)
 - ✅ Internal service-to-service endpoints
 - ✅ Health check endpoint
-- ✅ ENCS 691K specification comments throughout code
+- ✅ Spring Boot validation for request bodies
 
 **API Endpoints:**
 1. `POST /users/register` - Create new user
@@ -39,8 +40,9 @@ This document summarizes the completed implementation of the identity and access
 ### 2. Auth Service (services/auth-service) ✅
 
 **Files Created:**
-- `index.js` - Complete application with JWT authentication (332 lines)
-- `package.json` - Dependencies: express, jsonwebtoken
+- `pom.xml` - Spring Boot dependencies
+- `src/main/java/...` - Controllers, JWT service, validation
+- `src/main/resources/application.properties`
 - `Dockerfile` - Multi-stage build with health checks
 - `README.md` - Comprehensive security & API documentation (400+ lines)
 
@@ -49,10 +51,10 @@ This document summarizes the completed implementation of the identity and access
 - ✅ User login with credential validation
 - ✅ Token generation with user metadata
 - ✅ Token validation endpoints
-- ✅ Authentication middleware for protecting downstream services
+- ✅ Token validation endpoint for downstream services
 - ✅ Token expiration enforcement
 - ✅ Protected endpoint examples
-- ✅ ENCS 691K specification comments throughout code
+- ✅ Cookie-based token support
 
 **API Endpoints:**
 1. `POST /auth/login` - Authenticate user and issue JWT token
@@ -75,7 +77,7 @@ This document summarizes the completed implementation of the identity and access
 - ✅ Health checks for automatic container restart
 - ✅ Environment variable support
 - ✅ Proper port exposure (3001, 3002)
-- ✅ Alpine Linux for production-ready images
+- ✅ Eclipse Temurin 17 JRE base images
 
 ---
 
@@ -113,16 +115,16 @@ This document summarizes the completed implementation of the identity and access
 ### Start User Service
 ```bash
 cd services/user-service
-npm install
-npm start
+mvn clean package -DskipTests
+java -jar target/user-service-0.0.1-SNAPSHOT.jar
 # Service runs on http://localhost:3001
 ```
 
 ### Start Auth Service
 ```bash
 cd services/auth-service
-npm install
-npm start
+mvn clean package -DskipTests
+java -jar target/auth-service-0.0.1-SNAPSHOT.jar
 # Service runs on http://localhost:3002
 ```
 
@@ -160,16 +162,16 @@ services/
 ├── user-service/
 │   ├── Dockerfile              ✅ Multi-stage build
 │   ├── README.md               ✅ 300+ lines of API docs
-│   ├── index.js                ✅ 399 lines of implementation
-│   ├── package.json            ✅ Dependencies configured
-│   └── package-lock.json       (auto-generated)
+│   ├── pom.xml                 ✅ Dependencies configured
+│   ├── src/main/java/...       ✅ Controllers and models
+│   └── src/main/resources/     ✅ application.properties
 │
 └── auth-service/
     ├── Dockerfile              ✅ Multi-stage build
     ├── README.md               ✅ 400+ lines of security docs
-    ├── index.js                ✅ 332 lines of implementation
-    ├── package.json            ✅ Dependencies configured
-    └── package-lock.json       (auto-generated)
+   ├── pom.xml                 ✅ Dependencies configured
+   ├── src/main/java/...       ✅ Controllers and JWT service
+   └── src/main/resources/     ✅ application.properties
 
 IDENTITY_IMPLEMENTATION.md       ✅ Quick reference guide
 ```
@@ -183,13 +185,13 @@ IDENTITY_IMPLEMENTATION.md       ✅ Quick reference guide
 - **Deregistration:** Two-rule validation prevents invalid state
 - **Status Management:** Tracks selling and bidding status
 - **Service Integration:** Internal endpoints for status synchronization
-- **Demo-Ready:** Works immediately after npm install
+- **Demo-Ready:** Works immediately after Maven build
 
 ### Auth Service
 - **JWT Authentication:** Stateless, scalable token-based auth
-- **Token Validation:** Both direct and middleware-based validation
+- **Token Validation:** Direct validation endpoint for downstream services
 - **Demo Credentials:** john_doe/password123, jane_smith/securepass456
-- **Middleware Export:** Can be used by downstream services
+- **Cookie Support:** auth_token cookie issued on login
 - **Production Path:** Clear TODOs for production hardening
 
 ---
@@ -198,28 +200,28 @@ IDENTITY_IMPLEMENTATION.md       ✅ Quick reference guide
 
 ### User Service TODOs
 
-1. **Auction Service Integration** (index.js lines 145-157)
+1. **Auction Service Integration** (UserController.java)
    - Query: `GET /auctions/user/{userId}/active`
    - Update: `POST /users/{userId}/update-seller-status`
 
-2. **Bid Service Integration** (index.js lines 159-169)
+2. **Bid Service Integration** (UserController.java)
    - Query: `GET /bids/user/{userId}/active-highest`
    - Update: `POST /users/{userId}/update-bidder-status`
 
-3. **Auth Service Integration** (index.js line 112)
+3. **Auth Service Integration** (UserController.java)
    - Create credentials when new user registers
 
-4. **Notification Service Integration** (index.js lines 112, 155)
+4. **Notification Service Integration** (UserController.java)
    - Send welcome email on registration
    - Send confirmation on deregistration
 
 ### Auth Service TODOs
 
-1. **User Service Integration** (index.js line 105)
+1. **User Service Integration** (AuthController.java)
    - Fetch credentials from User Service instead of local storage
    - Implement password hashing with bcrypt/argon2
 
-2. **Rate Limiting** (index.js line 105)
+2. **Rate Limiting** (AuthController.java)
    - Prevent brute force attacks on login endpoint
 
 ---
@@ -292,11 +294,11 @@ All endpoints are immediately testable:
 - ✅ Production-ready error messages
 
 ### Maintainability
-- ✅ No external dependencies beyond express & jwt
+- ✅ Spring Boot dependencies only
 - ✅ Simple in-memory storage (easy to replace)
 - ✅ Clear request/response formats
 - ✅ Extensible endpoint structure
-- ✅ Modular middleware design
+- ✅ Modular controller/service design
 
 ---
 
@@ -305,10 +307,10 @@ All endpoints are immediately testable:
 ### 1. Local Development
 ```bash
 # Terminal 1
-cd services/user-service && npm start
+cd services/user-service && mvn clean package -DskipTests && java -jar target/user-service-0.0.1-SNAPSHOT.jar
 
 # Terminal 2
-cd services/auth-service && npm start
+cd services/auth-service && mvn clean package -DskipTests && java -jar target/auth-service-0.0.1-SNAPSHOT.jar
 ```
 
 ### 2. Docker
