@@ -1,17 +1,14 @@
-package com.auction.auctionservice;
+package com.auction.bidservice;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.Bean;
-import org.springframework.scheduling.annotation.EnableScheduling;
 import org.springframework.web.client.RestTemplate;
 
 @SpringBootApplication
-@EnableScheduling
-public class AuctionServiceApplication {
-
+public class BidServiceApplication {
     public static void main(String[] args) {
-        SpringApplication.run(AuctionServiceApplication.class, args);
+        SpringApplication.run(BidServiceApplication.class, args);
     }
 
     @Bean

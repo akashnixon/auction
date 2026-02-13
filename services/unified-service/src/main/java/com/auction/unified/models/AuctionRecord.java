@@ -1,44 +1,26 @@
-package com.auction.auctionservice.models;
+package com.auction.unified.models;
 
 import java.time.Instant;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-public class Auction {
-
-    private UUID auctionId;
+public class AuctionRecord {
+    private String auctionId;
     private String itemName;
     private String sellerId;
-
     private Instant startTime;
     private Instant endTime;
-
     private int cycleNumber;
     private AuctionStatus status;
     private String winningBidId;
     private String winnerUserId;
     private Instant finalizedAt;
-
     private final AtomicBoolean closing = new AtomicBoolean(false);
 
-    public Auction() {
-    }
-
-    public Auction(String itemName, String sellerId) {
-        this.auctionId = UUID.randomUUID();
-        this.itemName = itemName;
-        this.sellerId = sellerId;
-        this.cycleNumber = 1;
-        this.startTime = Instant.now();
-        this.endTime = this.startTime.plusSeconds(300);
-        this.status = AuctionStatus.ACTIVE;
-    }
-
-    public UUID getAuctionId() {
+    public String getAuctionId() {
         return auctionId;
     }
 
-    public void setAuctionId(UUID auctionId) {
+    public void setAuctionId(String auctionId) {
         this.auctionId = auctionId;
     }
 

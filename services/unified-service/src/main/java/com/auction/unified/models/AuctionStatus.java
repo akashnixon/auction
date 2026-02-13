@@ -1,4 +1,4 @@
-package com.auction.auctionservice.models;
+package com.auction.unified.models;
 
 public enum AuctionStatus {
     ACTIVE,
