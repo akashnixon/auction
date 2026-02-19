@@ -1,42 +1,23 @@
-# Stage 1: Build stage
-FROM node:18-alpine AS builder
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+COPY pom.xml ./
+COPY src ./src
 
-# Install dependencies
-RUN npm ci --only=production
+RUN mvn -q -DskipTests package
 
-# Stage 2: Runtime stage
-FROM node:18-alpine
+FROM eclipse-temurin:17-jre
 
-# Labels for documentation
-LABEL service="user-service"
-LABEL description="User Service - ENCS 691K Identity Layer"
-LABEL version="1.0.0"
-
-# Set working directory
 WORKDIR /app
 
-# Copy dependencies from builder stage
-COPY --from=builder /app/node_modules ./node_modules
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
-# Copy application code
-COPY package*.json ./
-COPY index.js ./
+COPY --from=build /app/target/*.jar /app/app.jar
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:3001/health', (r) => {if (r.statusCode !== 200) throw new Error(r.statusCode)})"
-
-# Expose port
 EXPOSE 3001
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV PORT=3001
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -f http://localhost:3001/health || exit 1
 
-# Run application
-CMD ["node", "index.js"]
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

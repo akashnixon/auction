@@ -6,8 +6,8 @@
 
 **Core Files:**
 - ✅ `Dockerfile` - Multi-stage build with health checks
-- ✅ `index.js` - 399 lines, 7 endpoints
-- ✅ `package.json` - Dependencies configured
+- ✅ `pom.xml` - Spring Boot dependencies configured
+- ✅ `src/main/java/...` - Controllers and models
 - ✅ `README.md` - 300+ lines comprehensive documentation
 
 **Implementation Features:**
@@ -40,8 +40,8 @@
 
 **Core Files:**
 - ✅ `Dockerfile` - Multi-stage build with health checks
-- ✅ `index.js` - 332 lines, JWT authentication implementation
-- ✅ `package.json` - Dependencies configured
+- ✅ `pom.xml` - Spring Boot dependencies configured
+- ✅ `src/main/java/...` - Controllers and JWT service
 - ✅ `README.md` - 400+ lines comprehensive documentation
 
 **Implementation Features:**
@@ -49,10 +49,10 @@
 - ✅ User login with credential validation
 - ✅ Token generation with expiration
 - ✅ Token validation endpoints
-- ✅ Authentication middleware (exportable)
+- ✅ Token validation endpoint for downstream services
 - ✅ Protected endpoint examples
 - ✅ Health check endpoint
-- ✅ ENCS 691K specification mapping in comments
+- ✅ Spring Boot validation in request bodies
 - ✅ Demo credentials included
 
 **API Endpoints (5 total):**
@@ -66,7 +66,7 @@
 - ✅ JWT signature verification
 - ✅ Token expiration enforcement
 - ✅ Bearer token extraction from headers
-- ✅ Middleware for protecting endpoints
+- ✅ Cookie-based token support
 - ✅ 401/403 error handling
 - ✅ Demo credentials: john_doe/password123, jane_smith/securepass456
 
@@ -173,14 +173,16 @@
 services/
 ├── user-service/                 ✅ Complete
 │   ├── Dockerfile               (52 lines)
-│   ├── index.js                 (399 lines)
-│   ├── package.json             (21 lines)
+│   ├── pom.xml                  (Spring Boot dependencies)
+│   ├── src/main/java/...        (Controllers/models)
+│   ├── src/main/resources/...   (application.properties)
 │   └── README.md                (300+ lines)
 │
 └── auth-service/                 ✅ Complete
     ├── Dockerfile               (52 lines)
-    ├── index.js                 (332 lines)
-    ├── package.json             (24 lines)
+    ├── pom.xml                  (Spring Boot dependencies)
+    ├── src/main/java/...        (Controllers/JWT service)
+    ├── src/main/resources/...   (application.properties)
     └── README.md                (400+ lines)
 
 Root Documentation:
@@ -188,9 +190,9 @@ Root Documentation:
 └── IMPLEMENTATION_SUMMARY.md     ✅ Complete
 ```
 
-**Total Lines of Code:** 731  
+**Total Lines of Code:** Spring Boot implementation  
 **Total Lines of Documentation:** 700+  
-**Total Files Created:** 10  
+**Total Files Created:** Spring Boot structure (multiple files)  
 **API Endpoints:** 12 (7 user-service + 5 auth-service)
 
 ---
@@ -200,13 +202,13 @@ Root Documentation:
 ### Check User Service Structure
 ```bash
 ls -la services/user-service/
-# Should show: Dockerfile, index.js, package.json, README.md
+# Should show: Dockerfile, pom.xml, src/, README.md
 ```
 
 ### Check Auth Service Structure
 ```bash
 ls -la services/auth-service/
-# Should show: Dockerfile, index.js, package.json, README.md
+# Should show: Dockerfile, pom.xml, src/, README.md
 ```
 
 ### Check Documentation
@@ -234,15 +236,15 @@ ls -la infra/kubernetes/          # Should be untouched
 **Terminal 1 - User Service:**
 ```bash
 cd services/user-service
-npm install
-npm start
+mvn clean package -DskipTests
+java -jar target/user-service-0.0.1-SNAPSHOT.jar
 ```
 
 **Terminal 2 - Auth Service:**
 ```bash
 cd services/auth-service
-npm install
-npm start
+mvn clean package -DskipTests
+java -jar target/auth-service-0.0.1-SNAPSHOT.jar
 ```
 
 Both services will start immediately and be ready for requests.
@@ -340,7 +342,7 @@ All limitations are clearly documented with TODO comments in the code.
 - ✅ Clear integration TODOs
 - ✅ No modifications to other folders
 - ✅ Simple, demo-friendly code
-- ✅ No external dependencies (except express, uuid, jwt)
+- ✅ Spring Boot dependencies only
 - ✅ No Redis, auction logic, bidding logic
 - ✅ No frontend or Kubernetes changes
 - ✅ Runnable backend code ready for testing
