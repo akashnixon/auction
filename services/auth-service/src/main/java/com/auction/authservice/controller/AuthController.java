@@ -3,6 +3,7 @@ package com.auction.authservice.controller;
 import com.auction.authservice.model.ApiError;
 import com.auction.authservice.model.AuthenticatedUser;
 import com.auction.authservice.model.LoginRequest;
+import com.auction.authservice.model.ServiceTokenRequest;
 import com.auction.authservice.model.TokenResponse;
 import com.auction.authservice.model.ValidateRequest;
 import com.auction.authservice.model.ValidateResponse;
@@ -12,14 +13,20 @@ import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayDeque;
+import java.util.Deque;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/auth")
@@ -28,21 +35,38 @@ public class AuthController {
             "john_doe", new DemoUser("user-001", "password123"),
             "jane_smith", new DemoUser("user-002", "securepass456")
     );
+    private static final int LOGIN_MAX_ATTEMPTS = 5;
+    private static final Duration LOGIN_ATTEMPT_WINDOW = Duration.ofMinutes(1);
 
     private final JwtService jwtService;
+    private final String internalServiceSecret;
+    private final Map<String, Deque<Instant>> failedLoginAttemptsByClient = new ConcurrentHashMap<>();
 
-    public AuthController(JwtService jwtService) {
+    public AuthController(JwtService jwtService,
+                          @Value("${internal.service.secret}") String internalServiceSecret) {
         this.jwtService = jwtService;
+        this.internalServiceSecret = internalServiceSecret;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
-        DemoUser demoUser = DEMO_USERS.get(request.getUsername());
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request,
+                                   HttpServletRequest httpRequest) {
+        String username = request.getUsername().trim().toLowerCase();
+        String clientKey = buildClientKey(httpRequest, username);
+
+        if (isRateLimited(clientKey)) {
+            return ResponseEntity.status(429).body(new ApiError("Too many login attempts. Try again shortly."));
+        }
+
+        DemoUser demoUser = DEMO_USERS.get(username);
         if (demoUser == null || !demoUser.password().equals(request.getPassword())) {
+            registerFailedAttempt(clientKey);
             return ResponseEntity.status(401).body(new ApiError("Invalid credentials"));
         }
 
-        AuthenticatedUser user = new AuthenticatedUser(demoUser.userId(), request.getUsername());
+        clearFailedAttempts(clientKey);
+
+        AuthenticatedUser user = new AuthenticatedUser(demoUser.userId(), username);
         String token = jwtService.generateToken(user);
         Instant issuedAt = Instant.now();
 
@@ -66,6 +90,27 @@ public class AuthController {
         return ResponseEntity.ok()
                 .header(HttpHeaders.SET_COOKIE, cookie.toString())
                 .body(response);
+    }
+
+    @PostMapping("/service-token")
+    public ResponseEntity<?> issueServiceToken(@Valid @RequestBody ServiceTokenRequest request,
+                                               @RequestHeader(value = "X-Internal-Auth", required = false) String internalAuthHeader) {
+        if (!safeEquals(internalAuthHeader, internalServiceSecret)) {
+            return ResponseEntity.status(401).body(new ApiError("Invalid internal authentication secret"));
+        }
+
+        String serviceName = request.getServiceName().trim().toLowerCase();
+        String token = jwtService.generateServiceToken(serviceName);
+        Instant issuedAt = Instant.now();
+
+        return ResponseEntity.ok(Map.of(
+                "token", token,
+                "tokenType", "Bearer",
+                "expiresIn", jwtService.getExpirationSeconds(),
+                "issuedAt", issuedAt,
+                "serviceName", serviceName,
+                "role", "SERVICE"
+        ));
     }
 
     @PostMapping("/validate")
@@ -135,6 +180,42 @@ public class AuthController {
         }
 
         return null;
+    }
+
+    private String buildClientKey(HttpServletRequest request, String normalizedUsername) {
+        String ip = request.getRemoteAddr() != null ? request.getRemoteAddr() : "unknown";
+        return normalizedUsername + "|" + ip;
+    }
+
+    private boolean isRateLimited(String clientKey) {
+        Deque<Instant> attempts = failedLoginAttemptsByClient.computeIfAbsent(clientKey, ignored -> new ArrayDeque<>());
+        Instant now = Instant.now();
+        Instant threshold = now.minus(LOGIN_ATTEMPT_WINDOW);
+
+        synchronized (attempts) {
+            while (!attempts.isEmpty() && attempts.peekFirst().isBefore(threshold)) {
+                attempts.pollFirst();
+            }
+            return attempts.size() >= LOGIN_MAX_ATTEMPTS;
+        }
+    }
+
+    private void registerFailedAttempt(String clientKey) {
+        Deque<Instant> attempts = failedLoginAttemptsByClient.computeIfAbsent(clientKey, ignored -> new ArrayDeque<>());
+        synchronized (attempts) {
+            attempts.offerLast(Instant.now());
+        }
+    }
+
+    private void clearFailedAttempts(String clientKey) {
+        failedLoginAttemptsByClient.remove(clientKey);
+    }
+
+    private boolean safeEquals(String left, String right) {
+        if (left == null || right == null) {
+            return false;
+        }
+        return MessageDigest.isEqual(left.getBytes(StandardCharsets.UTF_8), right.getBytes(StandardCharsets.UTF_8));
     }
 
     private record DemoUser(String userId, String password) {
