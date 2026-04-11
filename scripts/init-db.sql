@@ -1,3 +1,18 @@
+CREATE TABLE IF NOT EXISTS users (
+    id VARCHAR(64) PRIMARY KEY,
+    username VARCHAR(255) NOT NULL UNIQUE,
+    email VARCHAR(255) NOT NULL UNIQUE,
+    password_hash VARCHAR(255) NOT NULL,
+    is_active BOOLEAN NOT NULL,
+    is_selling BOOLEAN NOT NULL,
+    is_highest_bidder BOOLEAN NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL,
+    deregistered_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_username
+ON users (username);
+
 CREATE TABLE IF NOT EXISTS auctions (
     auction_id VARCHAR(64) PRIMARY KEY,
     item_name VARCHAR(255) NOT NULL,

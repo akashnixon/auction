@@ -1,11 +1,29 @@
 package com.auction.userservice.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
 import java.time.Instant;
 
+@Entity
+@Table(name = "users")
 public class User {
+    @Id
     private String id;
+
+    @Column(nullable = false, unique = true)
     private String username;
+
+    @Column(nullable = false, unique = true)
     private String email;
+
+    @JsonIgnore
+    @Column(name = "password_hash", nullable = false)
+    private String passwordHash;
+
     private boolean isActive;
     private boolean isSelling;
     private boolean isHighestBidder;
@@ -34,6 +52,14 @@ public class User {
 
     public void setEmail(String email) {
         this.email = email;
+    }
+
+    public String getPasswordHash() {
+        return passwordHash;
+    }
+
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = passwordHash;
     }
 
     public boolean isActive() {

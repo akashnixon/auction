@@ -161,8 +161,10 @@ find_user_id_by_username() {
 }
 
 RANDOM_SUFFIX="$(date +%s)"
-SELLER_USERNAME="john_doe"
-BIDDER1_USERNAME="jane_smith"
+SELLER_USERNAME="seller_${RANDOM_SUFFIX}"
+SELLER_PASSWORD="SellerPass123!"
+BIDDER1_USERNAME="bidder1_${RANDOM_SUFFIX}"
+BIDDER1_PASSWORD="BidderPass123!"
 EMAIL_DOMAIN="example.com"
 
 SELLER_ID=""
@@ -195,7 +197,7 @@ do
 done
 
 banner "User Registration + Uniqueness"
-code="$(http_json POST "$USER_BASE_URL/users/register" "{\"username\":\"$SELLER_USERNAME\",\"email\":\"$SELLER_USERNAME@$EMAIL_DOMAIN\"}")"
+code="$(http_json POST "$USER_BASE_URL/users/register" "{\"username\":\"$SELLER_USERNAME\",\"email\":\"$SELLER_USERNAME@$EMAIL_DOMAIN\",\"password\":\"$SELLER_PASSWORD\"}")"
 if assert_status "$code" "201"; then
   SELLER_ID="$(json_field '.id')"
   if [ -n "$SELLER_ID" ]; then
@@ -214,7 +216,7 @@ else
   fail "Seller registration expected 201 got $code"
 fi
 
-code="$(http_json POST "$USER_BASE_URL/users/register" "{\"username\":\"$BIDDER1_USERNAME\",\"email\":\"$BIDDER1_USERNAME@$EMAIL_DOMAIN\"}")"
+code="$(http_json POST "$USER_BASE_URL/users/register" "{\"username\":\"$BIDDER1_USERNAME\",\"email\":\"$BIDDER1_USERNAME@$EMAIL_DOMAIN\",\"password\":\"$BIDDER1_PASSWORD\"}")"
 if assert_status "$code" "201"; then
   BIDDER1_ID="$(json_field '.id')"
   [ -n "$BIDDER1_ID" ] && pass "Bidder1 registration" || fail "Bidder1 registration missing id"
@@ -233,7 +235,7 @@ else
 fi
 
 banner "Auth Endpoints"
-code="$(http_json POST "$AUTH_BASE_URL/auth/login" '{"username":"john_doe","password":"password123"}')"
+code="$(http_json POST "$AUTH_BASE_URL/auth/login" "{\"username\":\"$SELLER_USERNAME\",\"password\":\"$SELLER_PASSWORD\"}")"
 if assert_status "$code" "200"; then
   SELLER_TOKEN="$(json_field '.token')"
   [ -n "$SELLER_TOKEN" ] && pass "Seller auth login" || fail "Seller auth login missing token"
@@ -241,7 +243,7 @@ else
   fail "Seller auth login expected 200 got $code"
 fi
 
-code="$(http_json POST "$AUTH_BASE_URL/auth/login" '{"username":"jane_smith","password":"securepass456"}')"
+code="$(http_json POST "$AUTH_BASE_URL/auth/login" "{\"username\":\"$BIDDER1_USERNAME\",\"password\":\"$BIDDER1_PASSWORD\"}")"
 if assert_status "$code" "200"; then
   BIDDER1_TOKEN="$(json_field '.token')"
   [ -n "$BIDDER1_TOKEN" ] && pass "Bidder auth login" || fail "Bidder auth login missing token"

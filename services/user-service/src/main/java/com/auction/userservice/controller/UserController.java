@@ -1,29 +1,36 @@
 package com.auction.userservice.controller;
 
 import com.auction.userservice.model.ApiError;
+import com.auction.userservice.model.AuthUserResponse;
 import com.auction.userservice.model.BidderStatusRequest;
 import com.auction.userservice.model.DeregisterRequest;
 import com.auction.userservice.model.RegisterRequest;
 import com.auction.userservice.model.SellerStatusRequest;
 import com.auction.userservice.model.User;
+import com.auction.userservice.repository.UserRepository;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 @RestController
 @RequestMapping("/users")
 public class UserController {
-    private final Map<String, User> usersById = new ConcurrentHashMap<>();
-    private final Map<String, String> userIdByUsername = new ConcurrentHashMap<>();
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+
+    public UserController(UserRepository userRepository, PasswordEncoder passwordEncoder) {
+        this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+    }
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
         String username = request.getUsername().trim().toLowerCase(Locale.ROOT);
-        if (userIdByUsername.containsKey(username)) {
+        if (userRepository.existsByUsernameIgnoreCase(username)) {
             return ResponseEntity.badRequest().body(new ApiError("Username already exists"));
         }
 
@@ -32,13 +39,12 @@ public class UserController {
         user.setId(id);
         user.setUsername(username);
         user.setEmail(request.getEmail().trim());
+        user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setActive(true);
         user.setSelling(false);
         user.setHighestBidder(false);
         user.setCreatedAt(Instant.now());
-
-        usersById.put(id, user);
-        userIdByUsername.put(username, id);
+        userRepository.save(user);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("id", user.getId());
@@ -52,7 +58,7 @@ public class UserController {
 
     @PostMapping("/deregister")
     public ResponseEntity<?> deregister(@Valid @RequestBody DeregisterRequest request) {
-        User user = usersById.get(request.getUserId());
+        User user = userRepository.findById(request.getUserId()).orElse(null);
         if (user == null) {
             return ResponseEntity.status(404).body(new ApiError("User not found"));
         }
@@ -68,6 +74,7 @@ public class UserController {
 
         user.setActive(false);
         user.setDeregisteredAt(Instant.now());
+        userRepository.save(user);
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("id", user.getId());
@@ -80,7 +87,7 @@ public class UserController {
 
     @GetMapping("/{userId}")
     public ResponseEntity<?> getUser(@PathVariable String userId) {
-        User user = usersById.get(userId);
+        User user = userRepository.findById(userId).orElse(null);
         if (user == null) {
             return ResponseEntity.status(404).body(new ApiError("User not found"));
         }
@@ -90,31 +97,39 @@ public class UserController {
 
     @GetMapping
     public ResponseEntity<?> listUsers() {
-        return ResponseEntity.ok(Map.of("users", new ArrayList<>(usersById.values())));
+        return ResponseEntity.ok(Map.of("users", userRepository.findAll()));
+    }
+
+    @GetMapping("/internal/by-username/{username}")
+    public ResponseEntity<?> getUserForAuth(@PathVariable String username) {
+        return userRepository.findByUsernameIgnoreCase(username.trim().toLowerCase(Locale.ROOT))
+            .<ResponseEntity<?>>map(user -> ResponseEntity.ok(new AuthUserResponse(user)))
+            .orElseGet(() -> ResponseEntity.status(404).body(new ApiError("User not found")));
     }
 
     @PostMapping("/{userId}/update-seller-status")
     public ResponseEntity<?> updateSellerStatus(@PathVariable String userId,
                                                 @Valid @RequestBody SellerStatusRequest request) {
-        User user = usersById.get(userId);
+        User user = userRepository.findById(userId).orElse(null);
         if (user == null) {
             return ResponseEntity.status(404).body(new ApiError("User not found"));
         }
 
         user.setSelling(request.getIsSelling());
+        userRepository.save(user);
         return ResponseEntity.ok(Map.of("id", user.getId(), "isSelling", user.isSelling()));
     }
 
     @PostMapping("/{userId}/update-bidder-status")
     public ResponseEntity<?> updateBidderStatus(@PathVariable String userId,
                                                 @Valid @RequestBody BidderStatusRequest request) {
-        User user = usersById.get(userId);
+        User user = userRepository.findById(userId).orElse(null);
         if (user == null) {
             return ResponseEntity.status(404).body(new ApiError("User not found"));
         }
 
         user.setHighestBidder(request.getIsHighestBidder());
+        userRepository.save(user);
         return ResponseEntity.ok(Map.of("id", user.getId(), "isHighestBidder", user.isHighestBidder()));
     }
-
 }

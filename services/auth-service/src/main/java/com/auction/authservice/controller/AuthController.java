@@ -2,6 +2,7 @@ package com.auction.authservice.controller;
 
 import com.auction.authservice.model.ApiError;
 import com.auction.authservice.model.AuthenticatedUser;
+import com.auction.authservice.model.AuthUserResponse;
 import com.auction.authservice.model.LoginRequest;
 import com.auction.authservice.model.TokenResponse;
 import com.auction.authservice.model.ValidateRequest;
@@ -12,10 +13,13 @@ import io.jsonwebtoken.Claims;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -24,26 +28,28 @@ import java.util.Map;
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
-    private static final Map<String, DemoUser> DEMO_USERS = Map.of(
-            "john_doe", new DemoUser("user-001", "password123"),
-            "jane_smith", new DemoUser("user-002", "securepass456")
-    );
-
     private final JwtService jwtService;
+    private final RestTemplate restTemplate;
+    private final PasswordEncoder passwordEncoder;
 
-    public AuthController(JwtService jwtService) {
+    @Value("${services.user.base-url:http://localhost:3001}")
+    private String userServiceBaseUrl;
+
+    public AuthController(JwtService jwtService, RestTemplate restTemplate, PasswordEncoder passwordEncoder) {
         this.jwtService = jwtService;
+        this.restTemplate = restTemplate;
+        this.passwordEncoder = passwordEncoder;
     }
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
-        DemoUser demoUser = DEMO_USERS.get(request.getUsername());
-        if (demoUser == null || !demoUser.password().equals(request.getPassword())) {
+        AuthUserResponse user = findUserByUsername(request.getUsername());
+        if (user == null || !user.isActive() || !passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             return ResponseEntity.status(401).body(new ApiError("Invalid credentials"));
         }
 
-        AuthenticatedUser user = new AuthenticatedUser(demoUser.userId(), request.getUsername());
-        String token = jwtService.generateToken(user);
+        AuthenticatedUser authenticatedUser = new AuthenticatedUser(user.getId(), user.getUsername());
+        String token = jwtService.generateToken(authenticatedUser);
         Instant issuedAt = Instant.now();
 
         ResponseCookie cookie = ResponseCookie.from("auth_token", token)
@@ -59,8 +65,8 @@ public class AuthController {
                 "Bearer",
                 jwtService.getExpirationSeconds(),
                 issuedAt,
-                user.userId(),
-                user.username()
+                authenticatedUser.userId(),
+                authenticatedUser.username()
         );
 
         return ResponseEntity.ok()
@@ -136,7 +142,16 @@ public class AuthController {
 
         return null;
     }
-
-    private record DemoUser(String userId, String password) {
+    private AuthUserResponse findUserByUsername(String username) {
+        String normalized = username == null ? "" : username.trim().toLowerCase();
+        if (normalized.isBlank()) {
+            return null;
+        }
+        String url = userServiceBaseUrl + "/users/internal/by-username/" + normalized;
+        try {
+            return restTemplate.getForObject(url, AuthUserResponse.class);
+        } catch (Exception ex) {
+            return null;
+        }
     }
 }
