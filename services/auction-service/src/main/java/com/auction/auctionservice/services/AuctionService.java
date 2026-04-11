@@ -1,6 +1,7 @@
 package com.auction.auctionservice.services;
 
 import com.auction.auctionservice.dto.AuctionStateResponse;
+import com.auction.auctionservice.dto.AuthValidationResponse;
 import com.auction.auctionservice.dto.BidWinnerResponse;
 import com.auction.auctionservice.dto.NotificationEventRequest;
 import com.auction.auctionservice.models.Auction;
@@ -9,9 +10,11 @@ import com.auction.auctionservice.repositories.AuctionRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Instant;
 import java.util.*;
@@ -34,19 +37,25 @@ public class AuctionService {
     @Value("${services.notification.base-url:http://localhost:3005}")
     private String notificationServiceBaseUrl;
 
+    @Value("${services.auth.base-url:http://localhost:3002}")
+    private String authServiceBaseUrl;
+
+    @Value("${auction.duration-seconds:300}")
+    private long auctionDurationSeconds;
+
     public AuctionService(AuctionRepository auctionRepository, RestTemplate restTemplate) {
         this.auctionRepository = auctionRepository;
         this.restTemplate = restTemplate;
     }
 
-    public Auction createAuction(String itemName, String sellerId) {
+    public Auction createAuction(String itemName, String sellerId, String authorizationHeader) {
         if (itemName == null || itemName.isBlank()) {
             throw new IllegalArgumentException("itemName is required");
         }
         if (sellerId == null || sellerId.isBlank()) {
             throw new IllegalArgumentException("sellerId is required");
         }
-        ensureUserIsActive(sellerId);
+        ensureAuthenticatedActiveUser(authorizationHeader, sellerId, "seller");
 
         Auction auction = new Auction();
         auction.setAuctionId(UUID.randomUUID().toString());
@@ -54,7 +63,7 @@ public class AuctionService {
         auction.setSellerId(sellerId.trim());
         auction.setCycleNumber(1);
         auction.setStartTime(Instant.now());
-        auction.setEndTime(auction.getStartTime().plusSeconds(300));
+        auction.setEndTime(auction.getStartTime().plusSeconds(auctionDurationSeconds));
         auction.setStatus(AuctionStatus.ACTIVE);
 
         auction = auctionRepository.save(auction);
@@ -137,7 +146,7 @@ public class AuctionService {
     private void restartAuctionCycle(Auction auction) {
         auction.setCycleNumber(auction.getCycleNumber() + 1);
         auction.setStartTime(Instant.now());
-        auction.setEndTime(auction.getStartTime().plusSeconds(300));
+        auction.setEndTime(auction.getStartTime().plusSeconds(auctionDurationSeconds));
         auctionRepository.save(auction);
 
         Map<String, Object> payload = new HashMap<>();
@@ -200,23 +209,71 @@ public class AuctionService {
         }
     }
 
-    private void ensureUserIsActive(String userId) {
+    private void ensureAuthenticatedActiveUser(String authorizationHeader, String userId, String actorRole) {
+        AuthValidationResponse auth = validateAuthorizationHeader(authorizationHeader);
         String url = String.format("%s/users/%s", userServiceBaseUrl, userId);
         try {
             ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
             Map<?, ?> body = response.getBody();
             boolean active = false;
+            String username = null;
             if (body != null) {
                 Object isActive = body.get("isActive");
                 Object activeField = body.get("active");
                 active = Boolean.TRUE.equals(isActive) || Boolean.TRUE.equals(activeField);
+                Object usernameField = body.get("username");
+                username = usernameField == null ? null : String.valueOf(usernameField);
             }
             if (!active) {
-                throw new IllegalArgumentException("Seller must be an active registered user");
+                throw new IllegalArgumentException(capitalize(actorRole) + " must be an active registered user");
             }
+            if (username == null || auth.getUsername() == null || !username.equalsIgnoreCase(auth.getUsername())) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user does not match " + actorRole + "Id");
+            }
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (IllegalArgumentException ex) {
+            throw ex;
         } catch (Exception ex) {
-            throw new IllegalArgumentException("Seller must be an active registered user");
+            throw new IllegalArgumentException(capitalize(actorRole) + " must be an active registered user");
         }
+    }
+
+    private AuthValidationResponse validateAuthorizationHeader(String authorizationHeader) {
+        String token = extractBearerToken(authorizationHeader);
+        String url = authServiceBaseUrl + "/auth/validate";
+        Map<String, String> payload = Map.of("token", token);
+
+        try {
+            ResponseEntity<AuthValidationResponse> response = restTemplate.postForEntity(url, payload, AuthValidationResponse.class);
+            AuthValidationResponse body = response.getBody();
+            if (body == null || !body.isValid()) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token");
+            }
+            return body;
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token");
+        }
+    }
+
+    private String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing bearer token");
+        }
+        String token = authorizationHeader.substring(7).trim();
+        if (token.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing bearer token");
+        }
+        return token;
+    }
+
+    private String capitalize(String value) {
+        if (value == null || value.isBlank()) {
+            return "";
+        }
+        return Character.toUpperCase(value.charAt(0)) + value.substring(1);
     }
 
     private void updateSellerStatus(String userId, boolean isSelling, String auctionId) {

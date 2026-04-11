@@ -1,5 +1,6 @@
 package com.auction.bidservice.services;
 
+import com.auction.bidservice.dto.AuthValidationResponse;
 import com.auction.bidservice.dto.NotificationEventRequest;
 import com.auction.bidservice.dto.PlaceBidRequest;
 import com.auction.bidservice.models.Bid;
@@ -9,8 +10,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -33,6 +36,9 @@ public class BidService {
     @Value("${services.notification.base-url:http://localhost:3005}")
     private String notificationServiceBaseUrl;
 
+    @Value("${services.auth.base-url:http://localhost:3002}")
+    private String authServiceBaseUrl;
+
     public BidService(
         RestTemplate restTemplate,
         BidRepository bidRepository,
@@ -45,7 +51,7 @@ public class BidService {
         this.objectMapper = objectMapper;
     }
 
-    public synchronized Map<String, Object> placeBid(PlaceBidRequest request) {
+    public synchronized Map<String, Object> placeBid(PlaceBidRequest request, String authorizationHeader) {
         validateBidRequest(request);
 
         String auctionId = request.getAuctionId().trim();
@@ -55,10 +61,15 @@ public class BidService {
             ? UUID.randomUUID().toString()
             : request.getIdempotencyKey().trim();
 
+        AuthValidationResponse auth = validateAuthorizationHeader(authorizationHeader);
         Map<?, ?> user = fetchUser(bidderId);
         boolean active = Boolean.TRUE.equals(user.get("isActive")) || Boolean.TRUE.equals(user.get("active"));
         if (!active) {
             throw new IllegalArgumentException("Only active registered users can bid");
+        }
+        String username = user.get("username") == null ? null : String.valueOf(user.get("username"));
+        if (username == null || auth.getUsername() == null || !username.equalsIgnoreCase(auth.getUsername())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Authenticated user does not match bidderId");
         }
 
         Map<?, ?> auctionState = fetchAuctionState(auctionId);
@@ -271,6 +282,28 @@ public class BidService {
     private Map<?, ?> fetchAuctionState(String auctionId) {
         String url = auctionServiceBaseUrl + "/auctions/" + auctionId + "/state";
         return restTemplate.getForObject(url, Map.class);
+    }
+
+    private AuthValidationResponse validateAuthorizationHeader(String authorizationHeader) {
+        String token = extractBearerToken(authorizationHeader);
+        String url = authServiceBaseUrl + "/auth/validate";
+        Map<String, String> payload = Map.of("token", token);
+        AuthValidationResponse response = restTemplate.postForObject(url, payload, AuthValidationResponse.class);
+        if (response == null || !response.isValid()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid token");
+        }
+        return response;
+    }
+
+    private String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing bearer token");
+        }
+        String token = authorizationHeader.substring(7).trim();
+        if (token.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing bearer token");
+        }
+        return token;
     }
 
     private void updateUserBidderStatus(String userId, boolean isHighestBidder, String auctionId) {
