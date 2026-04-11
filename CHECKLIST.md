@@ -42,37 +42,31 @@
 - ✅ `Dockerfile` - Multi-stage build with health checks
 - ✅ `pom.xml` - Spring Boot dependencies configured
 - ✅ `src/main/java/...` - Controllers and JWT service
-- ✅ `README.md` - 380+ lines comprehensive documentation
+- ✅ `README.md` - 400+ lines comprehensive documentation
 
 **Implementation Features:**
 - ✅ JWT-based stateless authentication
 - ✅ User login with credential validation
-- ✅ Login rate limiting (failed-attempt window)
 - ✅ Token generation with expiration
 - ✅ Token validation endpoints
 - ✅ Token validation endpoint for downstream services
-- ✅ Internal service token issuance endpoint
-- ✅ Internal service authentication secret validation
 - ✅ Protected endpoint examples
 - ✅ Health check endpoint
 - ✅ Spring Boot validation in request bodies
 - ✅ Demo credentials included
 
-**API Endpoints (6 total):**
+**API Endpoints (5 total):**
 1. ✅ `POST /auth/login` - User authentication
 2. ✅ `POST /auth/validate` - Token validation
 3. ✅ `GET /auth/verify` - Current token verification
 4. ✅ `GET /auth/protected-example` - Protected endpoint example
-5. ✅ `POST /auth/service-token` - Internal service token issuance
-6. ✅ `GET /health` - Health check
+5. ✅ `GET /health` - Health check
 
 **Authentication Features:**
 - ✅ JWT signature verification
 - ✅ Token expiration enforcement
 - ✅ Bearer token extraction from headers
 - ✅ Cookie-based token support
-- ✅ Service token with `role=SERVICE` claim
-- ✅ Internal header secret validation (`X-Internal-Auth`)
 - ✅ 401/403 error handling
 - ✅ Demo credentials: john_doe/password123, jane_smith/securepass456
 
@@ -89,15 +83,15 @@
 - ✅ Multi-stage build (builder + runtime)
 - ✅ Health check configured
 - ✅ Port 3001 exposed
-- ✅ Environment variables supported (`PORT`, `JWT_SECRET`, `INTERNAL_SERVICE_SECRET`)
-- ✅ Eclipse Temurin JRE runtime image
+- ✅ Environment variables supported
+- ✅ Alpine base image (production-ready)
 
 **Auth Service:**
 - ✅ Multi-stage build (builder + runtime)
 - ✅ Health check configured
 - ✅ Port 3002 exposed
-- ✅ Environment variables (`JWT_SECRET`, `JWT_EXPIRATION_SECONDS`, `INTERNAL_SERVICE_SECRET`)
-- ✅ Eclipse Temurin JRE runtime image
+- ✅ Environment variables (JWT_SECRET, JWT_EXPIRY)
+- ✅ Alpine base image (production-ready)
 
 ### ✅ Documentation
 
@@ -122,7 +116,6 @@
 8. ✅ Simple in-memory storage (demo-friendly)
 9. ✅ REST endpoints with clear request/response examples
 10. ✅ Comments mapping logic to project specification
-11. ✅ Security hardening baseline: login rate limiting + internal service JWT enforcement
 
 ### ✅ Code Quality
 
@@ -146,11 +139,9 @@
 
 **Auth Service:**
 - ✅ Can login with demo credentials
-- ✅ Rate limits repeated failed login attempts
 - ✅ Can validate tokens independently
 - ✅ Can protect endpoints with middleware
 - ✅ Can verify tokens in headers
-- ✅ Can issue service tokens for inter-service calls
 
 ### ✅ Integration Points (Marked for Later)
 
@@ -159,11 +150,10 @@
 - ✅ TODO marked for Bid Service integration (lines 159-169)
 - ✅ TODO marked for Auth Service integration (line 112)
 - ✅ TODO marked for Notification Service (lines 112, 155)
-- ✅ Internal endpoints now enforce service auth (`Authorization`, `X-Service-Name`, `X-Internal-Auth`)
 
 **Auth Service Integrations:**
 - ✅ TODO marked for User Service integration (line 105)
-- ✅ Rate limiting implementation completed
+- ✅ TODO marked for rate limiting (line 105)
 
 ### ✅ Demo Readiness
 
@@ -193,7 +183,7 @@ services/
     ├── pom.xml                  (Spring Boot dependencies)
     ├── src/main/java/...        (Controllers/JWT service)
     ├── src/main/resources/...   (application.properties)
-    └── README.md                (380+ lines)
+    └── README.md                (400+ lines)
 
 Root Documentation:
 ├── IDENTITY_IMPLEMENTATION.md    ✅ Complete
@@ -203,7 +193,7 @@ Root Documentation:
 **Total Lines of Code:** Spring Boot implementation  
 **Total Lines of Documentation:** 700+  
 **Total Files Created:** Spring Boot structure (multiple files)  
-**API Endpoints:** 13 (7 user-service + 6 auth-service)
+**API Endpoints:** 12 (7 user-service + 5 auth-service)
 
 ---
 
@@ -288,9 +278,9 @@ docker run -p 3002:3002 -e JWT_SECRET=your-secret auth-service
 ### Short Term (Security hardening):
 1. Add password hashing (bcrypt/argon2)
 2. Move to database storage (PostgreSQL)
-3. Add HTTPS/TLS support
-4. Implement audit logging
-5. Add distributed rate limiting (Redis/API Gateway level)
+3. Implement rate limiting on login
+4. Add HTTPS/TLS support
+5. Implement audit logging
 
 ### Medium Term (Production readiness):
 1. Add token refresh mechanism
@@ -308,7 +298,7 @@ These limitations are intentional for demo purposes and should be addressed in p
 1. ✅ In-memory storage (lost on restart) - Use database for production
 2. ✅ Demo credentials in code - Use secure credential storage
 3. ✅ Plain text passwords - Use bcrypt/argon2 hashing
-4. ✅ Login rate limiting is in-memory - move to distributed rate limiting for production
+4. ✅ No rate limiting - Add rate limiter for production
 5. ✅ No audit logging - Add comprehensive audit trail
 6. ✅ No token blacklist - Implement revocation mechanism
 7. ✅ No HTTPS - Configure TLS/SSL
@@ -329,16 +319,9 @@ All limitations are clearly documented with TODO comments in the code.
 ### Scenario 2: Authentication Flow
 1. ✅ Login with correct credentials
 2. ✅ Login with incorrect credentials (should fail)
-3. ✅ Repeated failed logins trigger rate limiting (429)
-4. ✅ Validate token (should succeed)
-5. ✅ Access protected endpoint with token
-6. ✅ Access protected endpoint without token (should fail)
-
-### Scenario 4: Inter-Service Security Flow
-1. ✅ Request service token with valid `X-Internal-Auth`
-2. ✅ Reject service token request with invalid internal secret
-3. ✅ Call internal user update endpoint with service token + matching `X-Service-Name`
-4. ✅ Reject internal user update endpoint call on token/secret mismatch
+3. ✅ Validate token (should succeed)
+4. ✅ Access protected endpoint with token
+5. ✅ Access protected endpoint without token (should fail)
 
 ### Scenario 3: Deregistration Rules
 1. ✅ Deregister user (should succeed if no constraints)
@@ -363,14 +346,12 @@ All limitations are clearly documented with TODO comments in the code.
 - ✅ No Redis, auction logic, bidding logic
 - ✅ No frontend or Kubernetes changes
 - ✅ Runnable backend code ready for testing
-- ✅ Security hardening baseline implemented (JWT service enforcement + rate limiting + service auth)
 
 ---
 
 ## Status: ✅ COMPLETE
 
 **Implementation Date:** January 30, 2026  
-**Security Hardening Update:** April 11, 2026  
 **Status:** Ready for Demo and Integration  
 **Quality:** Production-Ready Code with Demo Data  
 **Documentation:** Comprehensive (700+ lines)  

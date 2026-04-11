@@ -31,21 +31,6 @@ public class JwtService {
         return Jwts.builder()
                 .setSubject(user.userId())
                 .claim("username", user.username())
-                .claim("role", "USER")
-                .setIssuedAt(Date.from(now))
-                .setExpiration(Date.from(expiresAt))
-                .signWith(secretKey, SignatureAlgorithm.HS256)
-                .compact();
-    }
-
-    public String generateServiceToken(String serviceName) {
-        Instant now = Instant.now();
-        Instant expiresAt = now.plusSeconds(expirationSeconds);
-
-        return Jwts.builder()
-                .setSubject("service:" + serviceName)
-                .claim("serviceName", serviceName)
-                .claim("role", "SERVICE")
                 .setIssuedAt(Date.from(now))
                 .setExpiration(Date.from(expiresAt))
                 .signWith(secretKey, SignatureAlgorithm.HS256)
