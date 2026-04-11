@@ -5,6 +5,7 @@ import com.auction.auctionservice.dto.BidWinnerResponse;
 import com.auction.auctionservice.dto.NotificationEventRequest;
 import com.auction.auctionservice.models.Auction;
 import com.auction.auctionservice.models.AuctionStatus;
+import com.auction.auctionservice.repositories.AuctionRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
@@ -13,19 +14,16 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 public class AuctionService {
 
-    private final Map<UUID, Auction> auctions = new ConcurrentHashMap<>();
+    private final AuctionRepository auctionRepository;
     private final RestTemplate restTemplate;
+    private final Map<String, ReentrantLock> closeLocks = new ConcurrentHashMap<>();
 
     @Value("${services.user.base-url:http://localhost:3001}")
     private String userServiceBaseUrl;
@@ -36,7 +34,8 @@ public class AuctionService {
     @Value("${services.notification.base-url:http://localhost:3005}")
     private String notificationServiceBaseUrl;
 
-    public AuctionService(RestTemplate restTemplate) {
+    public AuctionService(AuctionRepository auctionRepository, RestTemplate restTemplate) {
+        this.auctionRepository = auctionRepository;
         this.restTemplate = restTemplate;
     }
 
@@ -49,12 +48,20 @@ public class AuctionService {
         }
         ensureUserIsActive(sellerId);
 
-        Auction auction = new Auction(itemName.trim(), sellerId.trim());
-        auctions.put(auction.getAuctionId(), auction);
+        Auction auction = new Auction();
+        auction.setAuctionId(UUID.randomUUID().toString());
+        auction.setItemName(itemName.trim());
+        auction.setSellerId(sellerId.trim());
+        auction.setCycleNumber(1);
+        auction.setStartTime(Instant.now());
+        auction.setEndTime(auction.getStartTime().plusSeconds(300));
+        auction.setStatus(AuctionStatus.ACTIVE);
 
-        updateSellerStatus(sellerId, true, auction.getAuctionId().toString());
+        auction = auctionRepository.save(auction);
+
+        updateSellerStatus(sellerId, true, auction.getAuctionId());
         broadcastEvent("AUCTION_ADVERTISED", Map.of(
-            "auctionId", auction.getAuctionId().toString(),
+            "auctionId", auction.getAuctionId(),
             "itemName", auction.getItemName(),
             "sellerId", auction.getSellerId(),
             "cycleNumber", auction.getCycleNumber(),
@@ -65,50 +72,30 @@ public class AuctionService {
         return auction;
     }
 
-    public Auction getAuction(UUID auctionId) {
-        return auctions.get(auctionId);
+    public Auction getAuction(String auctionId) {
+        return auctionRepository.findById(auctionId).orElse(null);
     }
 
     public List<Auction> listAllAuctions() {
-        List<Auction> result = new ArrayList<>(auctions.values());
+        List<Auction> result = auctionRepository.findAll();
         result.sort(Comparator.comparing(Auction::getStartTime).reversed());
         return result;
     }
 
     public List<Auction> listActiveAuctions() {
-        List<Auction> active = new ArrayList<>();
-        for (Auction auction : auctions.values()) {
-            if (auction.getStatus() == AuctionStatus.ACTIVE) {
-                active.add(auction);
-            }
-        }
-        active.sort(Comparator.comparing(Auction::getEndTime));
-        return active;
+        return auctionRepository.findByStatusOrderByStartTimeDesc(AuctionStatus.ACTIVE);
     }
 
     public List<Auction> listActiveAuctionsForSeller(String sellerId) {
-        List<Auction> active = new ArrayList<>();
-        for (Auction auction : auctions.values()) {
-            if (auction.getStatus() == AuctionStatus.ACTIVE && auction.getSellerId().equals(sellerId)) {
-                active.add(auction);
-            }
-        }
-        return active;
+        return auctionRepository.findBySellerIdAndStatus(sellerId, AuctionStatus.ACTIVE);
     }
 
     public List<Auction> findExpiredActiveAuctions() {
-        Instant now = Instant.now();
-        List<Auction> expired = new ArrayList<>();
-        for (Auction auction : auctions.values()) {
-            if (auction.getStatus() == AuctionStatus.ACTIVE && !auction.getEndTime().isAfter(now)) {
-                expired.add(auction);
-            }
-        }
-        return expired;
+        return auctionRepository.findByStatusAndEndTimeLessThanEqual(AuctionStatus.ACTIVE, Instant.now());
     }
 
-    public AuctionStateResponse getAuctionState(UUID auctionId) {
-        Auction auction = auctions.get(auctionId);
+    public AuctionStateResponse getAuctionState(String auctionId) {
+        Auction auction = auctionRepository.findById(auctionId).orElse(null);
         if (auction == null) {
             return null;
         }
@@ -124,34 +111,37 @@ public class AuctionService {
     }
 
     public void processExpiredAuction(Auction auction) {
-        if (!auction.acquireClosingLock()) {
+        ReentrantLock lock = closeLocks.computeIfAbsent(auction.getAuctionId(), key -> new ReentrantLock());
+        if (!lock.tryLock()) {
             return;
         }
+
         try {
-            if (auction.getStatus() != AuctionStatus.ACTIVE || auction.getEndTime().isAfter(Instant.now())) {
+            Auction latest = auctionRepository.findById(auction.getAuctionId()).orElse(null);
+            if (latest == null || latest.getStatus() != AuctionStatus.ACTIVE || latest.getEndTime().isAfter(Instant.now())) {
                 return;
             }
 
-            BidWinnerResponse winner = fetchWinnerForCurrentCycle(auction);
+            BidWinnerResponse winner = fetchWinnerForCurrentCycle(latest);
             if (winner == null || winner.getBidId() == null || winner.getBidId().isBlank()) {
-                restartAuctionCycle(auction);
+                restartAuctionCycle(latest);
                 return;
             }
 
-            finalizeWithWinner(auction, winner);
+            finalizeWithWinner(latest, winner);
         } finally {
-            auction.releaseClosingLock();
+            lock.unlock();
         }
     }
 
     private void restartAuctionCycle(Auction auction) {
-        int nextCycle = auction.getCycleNumber() + 1;
-        auction.setCycleNumber(nextCycle);
+        auction.setCycleNumber(auction.getCycleNumber() + 1);
         auction.setStartTime(Instant.now());
         auction.setEndTime(auction.getStartTime().plusSeconds(300));
+        auctionRepository.save(auction);
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("auctionId", auction.getAuctionId().toString());
+        payload.put("auctionId", auction.getAuctionId());
         payload.put("itemName", auction.getItemName());
         payload.put("sellerId", auction.getSellerId());
         payload.put("cycleNumber", auction.getCycleNumber());
@@ -165,12 +155,13 @@ public class AuctionService {
         auction.setWinnerUserId(winner.getBidderId());
         auction.setStatus(AuctionStatus.ENDED);
         auction.setFinalizedAt(Instant.now());
+        auctionRepository.save(auction);
 
-        updateSellerStatus(auction.getSellerId(), false, auction.getAuctionId().toString());
+        updateSellerStatus(auction.getSellerId(), false, auction.getAuctionId());
         closeAuctionInBidService(auction.getAuctionId(), auction.getCycleNumber());
 
         Map<String, Object> payload = new HashMap<>();
-        payload.put("auctionId", auction.getAuctionId().toString());
+        payload.put("auctionId", auction.getAuctionId());
         payload.put("itemName", auction.getItemName());
         payload.put("sellerId", auction.getSellerId());
         payload.put("winnerUserId", winner.getBidderId());
@@ -200,12 +191,12 @@ public class AuctionService {
         }
     }
 
-    private void closeAuctionInBidService(UUID auctionId, int cycleNumber) {
+    private void closeAuctionInBidService(String auctionId, int cycleNumber) {
         String url = String.format("%s/internal/auctions/%s/cycles/%d/close", bidServiceBaseUrl, auctionId, cycleNumber);
         try {
             restTemplate.exchange(url, HttpMethod.POST, HttpEntity.EMPTY, Map.class);
         } catch (Exception ex) {
-            // Best-effort call; auction state remains authoritative in this service.
+            // Best effort call; auction state remains authoritative in this service.
         }
     }
 
@@ -214,7 +205,13 @@ public class AuctionService {
         try {
             ResponseEntity<Map> response = restTemplate.getForEntity(url, Map.class);
             Map<?, ?> body = response.getBody();
-            if (body == null || !Boolean.TRUE.equals(body.get("isActive"))) {
+            boolean active = false;
+            if (body != null) {
+                Object isActive = body.get("isActive");
+                Object activeField = body.get("active");
+                active = Boolean.TRUE.equals(isActive) || Boolean.TRUE.equals(activeField);
+            }
+            if (!active) {
                 throw new IllegalArgumentException("Seller must be an active registered user");
             }
         } catch (Exception ex) {
@@ -253,4 +250,5 @@ public class AuctionService {
         } catch (Exception ex) {
             // Best effort only.
         }
-    }}
+    }
+}

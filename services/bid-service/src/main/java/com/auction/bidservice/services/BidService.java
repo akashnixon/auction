@@ -3,25 +3,26 @@ package com.auction.bidservice.services;
 import com.auction.bidservice.dto.NotificationEventRequest;
 import com.auction.bidservice.dto.PlaceBidRequest;
 import com.auction.bidservice.models.Bid;
+import com.auction.bidservice.repositories.BidRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 public class BidService {
 
     private final RestTemplate restTemplate;
-
-    private final Map<String, List<Bid>> bidsByAuction = new ConcurrentHashMap<>();
-    private final Map<String, Bid> highestByAuctionCycle = new ConcurrentHashMap<>();
-    private final Map<String, Map<String, Object>> processedIdempotency = new ConcurrentHashMap<>();
+    private final BidRepository bidRepository;
+    private final StringRedisTemplate redisTemplate;
+    private final ObjectMapper objectMapper;
 
     @Value("${services.user.base-url:http://localhost:3001}")
     private String userServiceBaseUrl;
@@ -32,8 +33,16 @@ public class BidService {
     @Value("${services.notification.base-url:http://localhost:3005}")
     private String notificationServiceBaseUrl;
 
-    public BidService(RestTemplate restTemplate) {
+    public BidService(
+        RestTemplate restTemplate,
+        BidRepository bidRepository,
+        StringRedisTemplate redisTemplate,
+        ObjectMapper objectMapper
+    ) {
         this.restTemplate = restTemplate;
+        this.bidRepository = bidRepository;
+        this.redisTemplate = redisTemplate;
+        this.objectMapper = objectMapper;
     }
 
     public synchronized Map<String, Object> placeBid(PlaceBidRequest request) {
@@ -41,18 +50,14 @@ public class BidService {
 
         String auctionId = request.getAuctionId().trim();
         String bidderId = request.getBidderId().trim();
-        double amount = request.getAmount();
+        BigDecimal amount = BigDecimal.valueOf(request.getAmount());
         String idempotencyKey = request.getIdempotencyKey() == null || request.getIdempotencyKey().isBlank()
             ? UUID.randomUUID().toString()
             : request.getIdempotencyKey().trim();
 
-        String idemStoreKey = auctionId + ":" + bidderId + ":" + idempotencyKey;
-        if (processedIdempotency.containsKey(idemStoreKey)) {
-            return processedIdempotency.get(idemStoreKey);
-        }
-
         Map<?, ?> user = fetchUser(bidderId);
-        if (!Boolean.TRUE.equals(user.get("isActive"))) {
+        boolean active = Boolean.TRUE.equals(user.get("isActive")) || Boolean.TRUE.equals(user.get("active"));
+        if (!active) {
             throw new IllegalArgumentException("Only active registered users can bid");
         }
 
@@ -67,72 +72,86 @@ public class BidService {
         }
 
         int cycleNumber = ((Number) auctionState.get("cycleNumber")).intValue();
+
+        Optional<Bid> existing = bidRepository.findByAuctionIdAndBidderIdAndIdempotencyKey(auctionId, bidderId, idempotencyKey);
+        if (existing.isPresent()) {
+            return toResponse(existing.get(), isCurrentHighest(existing.get()));
+        }
+
+        Bid previousHighest = getHighestFromDatabase(auctionId, cycleNumber).orElse(null);
+
         Bid bid = new Bid();
         bid.setBidId(UUID.randomUUID().toString());
         bid.setAuctionId(auctionId);
         bid.setCycleNumber(cycleNumber);
         bid.setBidderId(bidderId);
         bid.setAmount(amount);
-        bid.setReceivedAt(Instant.now().toString());
+        bid.setReceivedAt(Instant.now());
         bid.setIdempotencyKey(idempotencyKey);
 
-        bidsByAuction.computeIfAbsent(auctionId, key -> new ArrayList<>()).add(bid);
-
-        Bid previousHighest = highestByAuctionCycle.get(cycleKey(auctionId, cycleNumber));
-        boolean changed = updateHighestBidIfNeeded(bid);
-        Bid currentHighest = highestByAuctionCycle.get(cycleKey(auctionId, cycleNumber));
-
-        if (changed && currentHighest != null) {
-            if (previousHighest != null && !Objects.equals(previousHighest.getBidderId(), currentHighest.getBidderId())) {
-                updateUserBidderStatus(previousHighest.getBidderId(), false, auctionId);
-            }
-            updateUserBidderStatus(currentHighest.getBidderId(), true, auctionId);
-
-            publishEvent("HIGHEST_BID_CHANGED", Map.of(
-                "auctionId", auctionId,
-                "cycleNumber", cycleNumber,
-                "bidderId", currentHighest.getBidderId(),
-                "bidId", currentHighest.getBidId(),
-                "amount", currentHighest.getAmount(),
-                "receivedAt", currentHighest.getReceivedAt()
-            ));
+        try {
+            bid = bidRepository.save(bid);
+        } catch (DataIntegrityViolationException ex) {
+            Bid alreadySaved = bidRepository
+                .findByAuctionIdAndBidderIdAndIdempotencyKey(auctionId, bidderId, idempotencyKey)
+                .orElseThrow();
+            return toResponse(alreadySaved, isCurrentHighest(alreadySaved));
         }
 
-        Map<String, Object> response = new HashMap<>();
-        response.put("bidId", bid.getBidId());
-        response.put("auctionId", bid.getAuctionId());
-        response.put("cycleNumber", bid.getCycleNumber());
-        response.put("bidderId", bid.getBidderId());
-        response.put("amount", bid.getAmount());
-        response.put("receivedAt", bid.getReceivedAt());
-        response.put("isHighestBid", currentHighest != null && Objects.equals(currentHighest.getBidId(), bid.getBidId()));
-        response.put("idempotencyKey", idempotencyKey);
+        Bid currentHighest = getHighestFromDatabase(auctionId, cycleNumber).orElse(null);
+        cacheHighestBid(auctionId, cycleNumber, currentHighest);
 
-        processedIdempotency.put(idemStoreKey, response);
-        return response;
+        if (currentHighest != null) {
+            boolean highestChanged = previousHighest == null || !Objects.equals(previousHighest.getBidId(), currentHighest.getBidId());
+            if (highestChanged) {
+                if (previousHighest != null && !Objects.equals(previousHighest.getBidderId(), currentHighest.getBidderId())) {
+                    updateUserBidderStatus(previousHighest.getBidderId(), false, auctionId);
+                }
+                updateUserBidderStatus(currentHighest.getBidderId(), true, auctionId);
+
+                publishEvent("HIGHEST_BID_CHANGED", Map.of(
+                    "auctionId", auctionId,
+                    "cycleNumber", cycleNumber,
+                    "bidderId", currentHighest.getBidderId(),
+                    "bidId", currentHighest.getBidId(),
+                    "amount", currentHighest.getAmount(),
+                    "receivedAt", currentHighest.getReceivedAt()
+                ));
+            }
+        }
+
+        return toResponse(bid, currentHighest != null && Objects.equals(currentHighest.getBidId(), bid.getBidId()));
     }
 
     public List<Bid> listBidsForAuction(String auctionId) {
-        List<Bid> bids = new ArrayList<>(bidsByAuction.getOrDefault(auctionId, List.of()));
-        bids.sort(Comparator.comparing(Bid::getReceivedAt));
-        return bids;
+        return bidRepository.findByAuctionIdOrderByReceivedAtAsc(auctionId);
     }
 
     public Map<String, Object> listActiveHighestForUser(String userId) {
+        Set<String> seen = new HashSet<>();
         List<Map<String, Object>> activeHighest = new ArrayList<>();
 
-        for (Map.Entry<String, Bid> entry : highestByAuctionCycle.entrySet()) {
-            Bid highest = entry.getValue();
+        for (Bid bid : bidRepository.findAll()) {
+            String key = cycleKey(bid.getAuctionId(), bid.getCycleNumber());
+            if (!seen.add(key)) {
+                continue;
+            }
+
+            Optional<Bid> highestOpt = getHighestFromDatabase(bid.getAuctionId(), bid.getCycleNumber());
+            if (highestOpt.isEmpty()) {
+                continue;
+            }
+
+            Bid highest = highestOpt.get();
             if (!Objects.equals(highest.getBidderId(), userId)) {
                 continue;
             }
 
-            String auctionId = highest.getAuctionId();
             try {
-                Map<?, ?> auctionState = fetchAuctionState(auctionId);
+                Map<?, ?> auctionState = fetchAuctionState(highest.getAuctionId());
                 if ("ACTIVE".equals(String.valueOf(auctionState.get("status")))) {
                     activeHighest.add(Map.of(
-                        "auctionId", auctionId,
+                        "auctionId", highest.getAuctionId(),
                         "cycleNumber", ((Number) auctionState.get("cycleNumber")).intValue(),
                         "bidId", highest.getBidId(),
                         "amount", highest.getAmount(),
@@ -147,29 +166,32 @@ public class BidService {
     }
 
     public Map<String, Object> getWinnerForCycle(String auctionId, int cycleNumber) {
-        Bid winner = highestByAuctionCycle.get(cycleKey(auctionId, cycleNumber));
-        if (winner == null) {
+        Optional<Bid> winner = getHighestFromDatabase(auctionId, cycleNumber);
+        if (winner.isEmpty()) {
             return Map.of();
         }
+
+        Bid bid = winner.get();
+        cacheHighestBid(auctionId, cycleNumber, bid);
         return Map.of(
-            "bidId", winner.getBidId(),
-            "bidderId", winner.getBidderId(),
-            "amount", String.valueOf(winner.getAmount()),
-            "receivedAt", winner.getReceivedAt()
+            "bidId", bid.getBidId(),
+            "bidderId", bid.getBidderId(),
+            "amount", String.valueOf(bid.getAmount()),
+            "receivedAt", bid.getReceivedAt()
         );
     }
 
     public Map<String, Object> closeCycle(String auctionId, int cycleNumber) {
-        Bid winner = highestByAuctionCycle.remove(cycleKey(auctionId, cycleNumber));
-        if (winner != null) {
-            updateUserBidderStatus(winner.getBidderId(), false, auctionId);
-        }
+        Optional<Bid> winner = getHighestFromDatabase(auctionId, cycleNumber);
+        winner.ifPresent(bid -> updateUserBidderStatus(bid.getBidderId(), false, auctionId));
+
+        redisTemplate.delete(redisKey(auctionId, cycleNumber));
 
         publishEvent("AUCTION_CYCLE_CLOSED", Map.of(
             "auctionId", auctionId,
             "cycleNumber", cycleNumber,
-            "winnerBidId", winner != null ? winner.getBidId() : null,
-            "winnerUserId", winner != null ? winner.getBidderId() : null
+            "winnerBidId", winner.map(Bid::getBidId).orElse(null),
+            "winnerUserId", winner.map(Bid::getBidderId).orElse(null)
         ));
 
         return Map.of(
@@ -190,38 +212,55 @@ public class BidService {
         }
     }
 
+    private Optional<Bid> getHighestFromDatabase(String auctionId, int cycleNumber) {
+        List<Bid> ordered = bidRepository.findHighestForCycleOrdered(auctionId, cycleNumber);
+        return ordered.isEmpty() ? Optional.empty() : Optional.of(ordered.get(0));
+    }
+
+    private boolean isCurrentHighest(Bid bid) {
+        return getHighestFromDatabase(bid.getAuctionId(), bid.getCycleNumber())
+            .map(top -> Objects.equals(top.getBidId(), bid.getBidId()))
+            .orElse(false);
+    }
+
     private String cycleKey(String auctionId, int cycleNumber) {
         return auctionId + ":" + cycleNumber;
     }
 
-    private boolean updateHighestBidIfNeeded(Bid candidate) {
-        String key = cycleKey(candidate.getAuctionId(), candidate.getCycleNumber());
-        Bid current = highestByAuctionCycle.get(key);
-        if (current == null) {
-            highestByAuctionCycle.put(key, candidate);
-            return true;
-        }
-
-        int comparison = compareBids(candidate, current);
-        if (comparison < 0) {
-            highestByAuctionCycle.put(key, candidate);
-            return true;
-        }
-
-        return false;
+    private String redisKey(String auctionId, int cycleNumber) {
+        return "highest:" + cycleKey(auctionId, cycleNumber);
     }
 
-    private int compareBids(Bid a, Bid b) {
-        if (a.getAmount() != b.getAmount()) {
-            return Double.compare(b.getAmount(), a.getAmount());
+    private void cacheHighestBid(String auctionId, int cycleNumber, Bid highest) {
+        String key = redisKey(auctionId, cycleNumber);
+        if (highest == null) {
+            redisTemplate.delete(key);
+            return;
         }
 
-        int timeCompare = Instant.parse(a.getReceivedAt()).compareTo(Instant.parse(b.getReceivedAt()));
-        if (timeCompare != 0) {
-            return timeCompare;
-        }
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("bidId", highest.getBidId());
+        payload.put("bidderId", highest.getBidderId());
+        payload.put("amount", highest.getAmount());
+        payload.put("receivedAt", highest.getReceivedAt());
 
-        return a.getBidId().compareTo(b.getBidId());
+        try {
+            redisTemplate.opsForValue().set(key, objectMapper.writeValueAsString(payload));
+        } catch (JsonProcessingException ignored) {
+        }
+    }
+
+    private Map<String, Object> toResponse(Bid bid, boolean isHighestBid) {
+        Map<String, Object> response = new HashMap<>();
+        response.put("bidId", bid.getBidId());
+        response.put("auctionId", bid.getAuctionId());
+        response.put("cycleNumber", bid.getCycleNumber());
+        response.put("bidderId", bid.getBidderId());
+        response.put("amount", bid.getAmount());
+        response.put("receivedAt", bid.getReceivedAt());
+        response.put("isHighestBid", isHighestBid);
+        response.put("idempotencyKey", bid.getIdempotencyKey());
+        return response;
     }
 
     private Map<?, ?> fetchUser(String userId) {
