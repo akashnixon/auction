@@ -15,7 +15,7 @@ It ensures that only authenticated users can access protected services through J
 - Authenticate users with username and password
 - Issue JWT tokens for authenticated sessions
 - Validate tokens and provide token verification endpoints
-- Export authentication middleware for protecting downstream services
+- Provide token validation endpoint for downstream services
 - Manage token lifecycle (issuing, validation, expiration)
 
 ---
@@ -46,8 +46,8 @@ JWT tokens include:
 
 - **Authentication:** POST `/auth/login` validates credentials and issues JWT tokens
 - **Authorization:** POST `/auth/validate` and GET `/auth/verify` verify tokens for protected access
-- **Middleware:** `authenticateToken` middleware exported for use in other services
-- **Token Lifecycle:** Configurable expiration via `JWT_EXPIRY` environment variable
+- **Token Validation:** `POST /auth/validate` for use in other services
+- **Token Lifecycle:** Configurable expiration via `JWT_EXPIRATION_SECONDS` environment variable
 
 ---
 
@@ -72,10 +72,12 @@ JWT tokens include:
 **Success Response (200 OK):**
 ```json
 {
-  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJ1c2VybmFtZSI6ImpvaG5fZG9lIiwiaWF0IjoxNzA2NTk1NjAwLCJleHAiOjE3MDY2ODIwMDB9.abcd1234...",
-  "userId": "550e8400-e29b-41d4-a716-446655440000",
-  "username": "john_doe",
-  "expiresIn": "24h"
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ1c2VyLTAwMSIsInVzZXJuYW1lIjoiam9obl9kb2UiLCJpYXQiOjE3MDc4NDAwMDAsImV4cCI6MTcwNzkyNjQwMH0.abcd1234...",
+  "tokenType": "Bearer",
+  "expiresIn": 86400,
+  "issuedAt": "2026-02-13T20:00:00Z",
+  "userId": "user-001",
+  "username": "john_doe"
 }
 ```
 
@@ -238,56 +240,36 @@ Authorization: Bearer <valid-token>
 
 ---
 
-## Using Authentication Middleware
+## Using Token Validation in Downstream Services
 
 ### For Protecting Downstream Services
 
-The Auth Service exports `authenticateToken` middleware for use in other services:
+Use the Auth Service validation endpoint to verify tokens in any service (Auction, Bid, Notification, etc.).
 
-**Example in Auction Service (pseudo-code):**
-```javascript
-const { authenticateToken } = require('auth-service');
-const app = express();
-
-// Protect public endpoints
-app.post('/auctions', authenticateToken, (req, res) => {
-  // req.user contains decoded token: { userId, username, iat, exp }
-  const userId = req.user.userId;
-  // ... create auction for this user
-});
-
-// Protect seller operations
-app.get('/auctions/my-listings', authenticateToken, (req, res) => {
-  const userId = req.user.userId;
-  // ... get auctions created by this user
-});
+**Validate token (service-to-service):**
+```bash
+curl -X POST http://localhost:3002/auth/validate \
+  -H "Content-Type: application/json" \
+  -d '{"token": "<jwt>"}'
 ```
 
-### Middleware Behavior
+**Success Response:**
+```json
+{
+  "valid": true,
+  "userId": "user-001",
+  "username": "john_doe",
+  "issuedAt": "2026-02-13T20:00:00Z",
+  "expiresAt": "2026-02-14T20:00:00Z"
+}
+```
 
-```javascript
-const authenticateToken = (req, res, next) => {
-  // 1. Extract token from Authorization header
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Get "Bearer <token>"
-
-  // 2. Return 401 if no token
-  if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
-  }
-
-  // 3. Verify token signature and expiration
-  jwt.verify(token, JWT_SECRET, (err, user) => {
-    if (err) {
-      // Return 403 if token invalid/expired
-      return res.status(403).json({ error: 'Invalid or expired token' });
-    }
-
-    // 4. Attach decoded token to request
-    req.user = user; // { userId, username, iat, exp }
-    next(); // Continue to next middleware/handler
-  });
-};
+**Failure Response:**
+```json
+{
+  "valid": false,
+  "error": "Invalid token"
+}
 ```
 
 ---
@@ -295,20 +277,18 @@ const authenticateToken = (req, res, next) => {
 ## Quick Start
 
 ### Prerequisites
-- Node.js 14+ installed
+- Java 17+ installed
+- Maven 3.9+ installed
 - Port 3002 available (or set `PORT` environment variable)
 
 ### Installation & Running
 
 ```bash
-# Install dependencies
-npm install
+# Build
+mvn clean package -DskipTests
 
-# Start the service
-npm start
-
-# Or with auto-reload (requires nodemon)
-npm run dev
+# Run
+java -jar target/auth-service-0.0.1-SNAPSHOT.jar
 ```
 
 ### Testing Endpoints
@@ -356,9 +336,8 @@ PORT=3002
 # JWT secret key for signing tokens (CHANGE IN PRODUCTION!)
 JWT_SECRET=demo-secret-key-change-in-production
 
-# Token expiration time (default: 24h)
-# Supports: '2h', '1d', 86400 (seconds), etc.
-JWT_EXPIRY=24h
+# Token expiration time in seconds (default: 86400 = 24h)
+JWT_EXPIRATION_SECONDS=86400
 ```
 
 ### Production Configuration
@@ -366,9 +345,9 @@ JWT_EXPIRY=24h
 **⚠️ CRITICAL SECURITY ISSUES:**
 
 1. **JWT Secret:** Generate a strong, random secret
-   ```bash
-   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
-   ```
+  ```bash
+  openssl rand -hex 32
+  ```
 
 2. **Password Storage:** Credentials are currently stored in plain text
    - TODO: Implement bcrypt/argon2 password hashing
@@ -412,7 +391,7 @@ JWT_EXPIRY=24h
   - Store/validate credentials on User Service
   - Keep Auth Service stateless
 
-**Code Location:** `index.js` line ~105 (Login endpoint)
+**Code Location:** `AuthController.java` (Login endpoint)
 
 ### With External Identity Providers
 - **Problem:** No OAuth 2.0 / OIDC support
@@ -430,7 +409,7 @@ JWT_EXPIRY=24h
   - Block after N failed attempts
   - Return 429 Too Many Requests
 
-**Code Location:** `index.js` line ~105 (Login endpoint)
+**Code Location:** `AuthController.java` (Login endpoint)
 
 ---
 
@@ -463,8 +442,9 @@ Credentials {
 
 ```
 auth-service/
-├── index.js               # Main application file with authentication logic
-├── package.json           # Dependencies and scripts
+├── pom.xml                # Maven dependencies
+├── src/main/java/...      # Controllers, JWT service, validation
+├── src/main/resources/    # application.properties
 ├── Dockerfile             # Docker container definition
 └── README.md              # This file
 ```

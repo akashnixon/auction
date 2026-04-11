@@ -3,10 +3,9 @@ package com.auction.auctionservice.dto;
 import com.auction.auctionservice.models.AuctionStatus;
 
 import java.time.Instant;
-import java.util.UUID;
 
 public class AuctionStateResponse {
-    private UUID auctionId;
+    private String auctionId;
     private String itemName;
     private String sellerId;
     private AuctionStatus status;
@@ -14,11 +13,11 @@ public class AuctionStateResponse {
     private Instant startTime;
     private Instant endTime;
 
-    public UUID getAuctionId() {
+    public String getAuctionId() {
         return auctionId;
     }
 
-    public void setAuctionId(UUID auctionId) {
+    public void setAuctionId(String auctionId) {
         this.auctionId = auctionId;
     }
 

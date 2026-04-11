@@ -11,14 +11,16 @@ This document provides a quick reference for the implemented identity and access
 ```
 services/
 ├── user-service/              ← Identity Management
-│   ├── index.js              # User registration/deregistration logic
-│   ├── package.json          # Dependencies: express, uuid
+│   ├── pom.xml               # Spring Boot dependencies
+│   ├── src/main/java/...     # Controllers, models, services
+│   ├── src/main/resources/   # application.properties
 │   ├── Dockerfile            # Multi-stage build with health checks
 │   └── README.md             # Comprehensive API documentation
 │
 └── auth-service/              ← Access Control
-    ├── index.js              # JWT authentication & validation
-    ├── package.json          # Dependencies: express, jsonwebtoken
+  ├── pom.xml               # Spring Boot dependencies
+  ├── src/main/java/...     # Controllers, models, security
+  ├── src/main/resources/   # application.properties
     ├── Dockerfile            # Multi-stage build with health checks
     └── README.md             # Complete API documentation
 ```
@@ -31,8 +33,8 @@ services/
 
 ```bash
 cd services/user-service
-npm install
-npm start
+mvn clean package -DskipTests
+java -jar target/user-service-0.0.1-SNAPSHOT.jar
 ```
 
 **Test Registration:**
@@ -46,8 +48,8 @@ curl -X POST http://localhost:3001/users/register \
 
 ```bash
 cd services/auth-service
-npm install
-npm start
+mvn clean package -DskipTests
+java -jar target/auth-service-0.0.1-SNAPSHOT.jar
 ```
 
 **Test Login:**
@@ -65,21 +67,21 @@ curl -X POST http://localhost:3002/auth/login \
 
 | Requirement | Implementation | File | Location |
 |---|---|---|---|
-| **UC1: User Registration** | POST `/users/register` enforces unique username | index.js | Lines 56-87 |
-| **UC2: User Deregistration** | POST `/users/deregister` with rule validation | index.js | Lines 135-183 |
-| **Rule 1: Not Selling** | Check `user.isSelling` before deregistration | index.js | Lines 159-167 |
-| **Rule 2: Not Highest Bidder** | Check `user.isHighestBidder` before deregistration | index.js | Lines 169-177 |
-| **Service Communication** | Internal endpoints for status updates | index.js | Lines 242-301 |
+| **UC1: User Registration** | POST `/users/register` enforces unique username | UserController.java | Registration handler |
+| **UC2: User Deregistration** | POST `/users/deregister` with rule validation | UserController.java | Deregistration handler |
+| **Rule 1: Not Selling** | Check `user.isSelling` before deregistration | UserController.java | Deregistration handler |
+| **Rule 2: Not Highest Bidder** | Check `user.isHighestBidder` before deregistration | UserController.java | Deregistration handler |
+| **Service Communication** | Internal endpoints for status updates | UserController.java | Status update handlers |
 
 ### Auth Service
 
 | Requirement | Implementation | File | Location |
 |---|---|---|---|
-| **User Login** | POST `/auth/login` with credential validation | index.js | Lines 79-128 |
-| **Token Issuance** | JWT tokens with userId, username, exp | index.js | Lines 117-120 |
-| **Token Validation** | POST `/auth/validate` for independent verification | index.js | Lines 130-162 |
-| **Auth Middleware** | `authenticateToken` for protecting endpoints | index.js | Lines 47-75 |
-| **Protected Example** | GET `/auth/protected-example` with middleware | index.js | Lines 180-192 |
+| **User Login** | POST `/auth/login` with credential validation | AuthController.java | Login handler |
+| **Token Issuance** | JWT tokens with userId, username, exp | JwtService.java | Token generation |
+| **Token Validation** | POST `/auth/validate` for independent verification | AuthController.java | Validate handler |
+| **Auth Filter** | Auth token filter for protected endpoint | AuthTokenFilter.java | Filter logic |
+| **Protected Example** | GET `/auth/protected-example` with filter | AuthController.java | Protected handler |
 
 ---
 
@@ -103,9 +105,10 @@ curl -X POST http://localhost:3002/auth/login \
 - ✅ User login with password validation
 - ✅ JWT token generation and signing
 - ✅ Token validation endpoint (POST)
-- ✅ Token verification middleware
+- ✅ Token verification filter
 - ✅ Protected endpoint example
 - ✅ Token expiration enforcement
+- ✅ Cookie-based token support
 - ✅ In-memory demo credentials
 - ✅ Health check endpoint
 - ✅ Comprehensive error handling
@@ -183,32 +186,32 @@ curl http://localhost:3002/auth/protected-example \
 1. **With Auction Service**
    - Query `/auctions/user/{userId}/active` to check if user is selling
    - Update user status via `/users/{userId}/update-seller-status`
-   - Location: index.js lines 145-157
+  - Location: UserController.java (deregister/status handlers)
 
 2. **With Bid Service**
    - Query `/bids/user/{userId}/active-highest` to check highest bidder status
    - Update user status via `/users/{userId}/update-bidder-status`
-   - Location: index.js lines 159-169
+  - Location: UserController.java (deregister/status handlers)
 
 3. **With Auth Service**
    - Create login credentials when new user registers
-   - Location: index.js line 112
+  - Location: UserController.java (register handler)
 
 4. **With Notification Service**
    - Send welcome email on registration
    - Send deregistration confirmation email
-   - Location: index.js lines 112, 155
+  - Location: UserController.java (register/deregister handlers)
 
 ### Auth Service Integration Points
 
 1. **With User Service**
    - Fetch user credentials from User Service instead of local storage
    - Validate passwords against User Service records
-   - Location: index.js line 105
+  - Location: AuthController.java (login handler)
 
 2. **With Rate Limiting Service** (Future)
    - Prevent brute force attacks on login
-   - Location: index.js line 105
+  - Location: AuthController.java (login handler)
 
 ---
 
@@ -240,14 +243,14 @@ curl http://localhost:3002/auth/protected-example \
 ## File Size & Dependencies
 
 ### User Service
-- **index.js:** ~300 lines
-- **Dependencies:** express (4.18.2), uuid (9.0.0)
-- **Image Size:** ~150MB (Node 18 Alpine base)
+- **Core Classes:** UserController, User models, validation
+- **Dependencies:** Spring Boot Web + Validation
+- **Image Base:** Eclipse Temurin 17 JRE
 
 ### Auth Service
-- **index.js:** ~350 lines
-- **Dependencies:** express (4.18.2), jsonwebtoken (9.1.0)
-- **Image Size:** ~150MB (Node 18 Alpine base)
+- **Core Classes:** AuthController, JwtService, validation
+- **Dependencies:** Spring Boot Web + Validation + JJWT
+- **Image Base:** Eclipse Temurin 17 JRE
 
 ---
 
@@ -285,8 +288,8 @@ Auth Service Tests:
 
 ### Option 1: Local Development
 ```bash
-cd services/user-service && npm start &
-cd services/auth-service && npm start &
+cd services/user-service && mvn clean package -DskipTests && java -jar target/user-service-0.0.1-SNAPSHOT.jar &
+cd services/auth-service && mvn clean package -DskipTests && java -jar target/auth-service-0.0.1-SNAPSHOT.jar &
 ```
 
 ### Option 2: Docker Build

@@ -308,20 +308,18 @@ Uses **in-memory storage** for demo/development purposes. Each user has:
 ## Quick Start
 
 ### Prerequisites
-- Node.js 14+ installed
+- Java 17+ installed
+- Maven 3.9+ installed
 - Port 3001 available (or set `PORT` environment variable)
 
 ### Installation & Running
 
 ```bash
-# Install dependencies
-npm install
+# Build
+mvn clean package -DskipTests
 
-# Start the service
-npm start
-
-# Or with auto-reload (requires nodemon)
-npm run dev
+# Run
+java -jar target/user-service-0.0.1-SNAPSHOT.jar
 ```
 
 ### Testing Endpoints
@@ -380,7 +378,7 @@ curl -X POST http://localhost:3001/users/deregister \
   - Response indicates if user has active listings
   - Update `user.isSelling` flag based on result
 
-**Code Location:** `index.js` lines ~145-157 (Deregistration Rule 1)
+**Code Location:** `UserController.java` (Deregistration handler)
 
 ### With Bid Service
 - **Problem:** Need to verify user is not highest bidder before deregistration
@@ -390,7 +388,7 @@ curl -X POST http://localhost:3001/users/deregister \
   - Update `user.isHighestBidder` flag based on result
   - Return affected auction IDs in error response
 
-**Code Location:** `index.js` lines ~159-169 (Deregistration Rule 2)
+**Code Location:** `UserController.java` (Deregistration handler)
 
 ### With Auth Service
 - **Problem:** New user registration doesn't create login credentials
@@ -398,7 +396,7 @@ curl -X POST http://localhost:3001/users/deregister \
   - `POST /auth/register` with username and temporary password
   - TODO: Decide on password initialization strategy
 
-**Code Location:** `index.js` line ~112 (Register endpoint)
+**Code Location:** `UserController.java` (Register endpoint)
 
 ### With Notification Service
 - **Problem:** Users don't receive welcome/deregistration emails
@@ -406,7 +404,7 @@ curl -X POST http://localhost:3001/users/deregister \
   - `POST /notifications/email` to send welcome on registration
   - `POST /notifications/email` to send confirmation on deregistration
 
-**Code Location:** `index.js` lines ~112, ~155
+**Code Location:** `UserController.java` (Register/Deregister handlers)
 
 ---
 
@@ -441,8 +439,9 @@ PORT=3001                    # Port to listen on (default: 3001)
 
 ```
 user-service/
-├── index.js               # Main application file
-├── package.json           # Dependencies and scripts
+├── pom.xml                # Maven dependencies
+├── src/main/java/...      # Controllers and models
+├── src/main/resources/    # application.properties
 ├── Dockerfile             # Docker container definition
 └── README.md              # This file
 ```

@@ -1,44 +1,50 @@
 package com.auction.auctionservice.models;
 
-import java.time.Instant;
-import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
+import jakarta.persistence.*;
 
+import java.time.Instant;
+
+@Entity
+@Table(name = "auctions")
 public class Auction {
 
-    private UUID auctionId;
+    @Id
+    @Column(name = "auction_id", nullable = false, updatable = false)
+    private String auctionId;
+
+    @Column(name = "item_name", nullable = false)
     private String itemName;
+
+    @Column(name = "seller_id", nullable = false)
     private String sellerId;
 
+    @Column(name = "start_time", nullable = false)
     private Instant startTime;
+
+    @Column(name = "end_time", nullable = false)
     private Instant endTime;
 
+    @Column(name = "cycle_number", nullable = false)
     private int cycleNumber;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status", nullable = false)
     private AuctionStatus status;
+
+    @Column(name = "winning_bid_id")
     private String winningBidId;
+
+    @Column(name = "winner_user_id")
     private String winnerUserId;
+
+    @Column(name = "finalized_at")
     private Instant finalizedAt;
 
-    private final AtomicBoolean closing = new AtomicBoolean(false);
-
-    public Auction() {
-    }
-
-    public Auction(String itemName, String sellerId) {
-        this.auctionId = UUID.randomUUID();
-        this.itemName = itemName;
-        this.sellerId = sellerId;
-        this.cycleNumber = 1;
-        this.startTime = Instant.now();
-        this.endTime = this.startTime.plusSeconds(300);
-        this.status = AuctionStatus.ACTIVE;
-    }
-
-    public UUID getAuctionId() {
+    public String getAuctionId() {
         return auctionId;
     }
 
-    public void setAuctionId(UUID auctionId) {
+    public void setAuctionId(String auctionId) {
         this.auctionId = auctionId;
     }
 
@@ -112,13 +118,5 @@ public class Auction {
 
     public void setFinalizedAt(Instant finalizedAt) {
         this.finalizedAt = finalizedAt;
-    }
-
-    public boolean acquireClosingLock() {
-        return closing.compareAndSet(false, true);
-    }
-
-    public void releaseClosingLock() {
-        closing.set(false);
     }
 }

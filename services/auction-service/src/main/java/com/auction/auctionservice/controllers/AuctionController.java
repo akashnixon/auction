@@ -5,6 +5,7 @@ import com.auction.auctionservice.dto.CreateAuctionRequest;
 import com.auction.auctionservice.models.Auction;
 import com.auction.auctionservice.models.AuctionStatus;
 import com.auction.auctionservice.services.AuctionService;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,7 +14,6 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/auctions")
@@ -26,9 +26,13 @@ public class AuctionController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createAuction(@RequestBody CreateAuctionRequest request) {
+    public ResponseEntity<?> createAuction(@RequestBody CreateAuctionRequest request, HttpServletRequest httpRequest) {
         try {
-            Auction auction = auctionService.createAuction(request.getItemName(), request.getSellerId());
+            Auction auction = auctionService.createAuction(
+                request.getItemName(),
+                request.getSellerId(),
+                httpRequest.getHeader("Authorization")
+            );
             return ResponseEntity.status(HttpStatus.CREATED).body(auction);
         } catch (IllegalArgumentException ex) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", ex.getMessage()));
@@ -47,30 +51,20 @@ public class AuctionController {
 
     @GetMapping("/{auctionId}")
     public ResponseEntity<?> getAuction(@PathVariable String auctionId) {
-        try {
-            UUID id = UUID.fromString(auctionId);
-            Auction auction = auctionService.getAuction(id);
-            if (auction == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Auction not found"));
-            }
-            return ResponseEntity.ok(auction);
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Invalid auctionId"));
+        Auction auction = auctionService.getAuction(auctionId);
+        if (auction == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Auction not found"));
         }
+        return ResponseEntity.ok(auction);
     }
 
     @GetMapping("/{auctionId}/state")
     public ResponseEntity<?> getAuctionState(@PathVariable String auctionId) {
-        try {
-            UUID id = UUID.fromString(auctionId);
-            AuctionStateResponse state = auctionService.getAuctionState(id);
-            if (state == null) {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Auction not found"));
-            }
-            return ResponseEntity.ok(state);
-        } catch (IllegalArgumentException ex) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(Map.of("error", "Invalid auctionId"));
+        AuctionStateResponse state = auctionService.getAuctionState(auctionId);
+        if (state == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Auction not found"));
         }
+        return ResponseEntity.ok(state);
     }
 
     @GetMapping("/user/{userId}/active")
