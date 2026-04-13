@@ -1,3 +1,9 @@
+/*  Tailwind */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*  styles */
 :root {
   font-family: Arial, sans-serif;
   color: #0f172a;
