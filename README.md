@@ -114,6 +114,24 @@ Each service is independently deployable, stateless, and horizontally scalable.
 A `docker-compose.yml` file is provided for local development and demonstration.  
 Each service can also be built and run independently.
 
+## Running The Product
+For a step-by-step local run guide, see:
+
+- `docs/RUNNING.md`
+
+Quick start from `main`:
+
+1. Start PostgreSQL and Redis.
+2. Initialize the database with `scripts/init-db.sql`.
+3. Start all five backend services.
+4. Start the Vite frontend in `frontend/`.
+5. Open `http://localhost:5173`.
+
+Current local demo behavior:
+- auctions run with a `30-second` window by default for faster demos
+- PostgreSQL is used for persistence
+- Redis is used for highest-bid caching
+
 ---
 
 ## Demo Strategy
