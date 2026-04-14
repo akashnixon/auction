@@ -8,6 +8,7 @@ import com.auction.userservice.model.RegisterRequest;
 import com.auction.userservice.model.SellerStatusRequest;
 import com.auction.userservice.model.User;
 import com.auction.userservice.repository.UserRepository;
+import com.auction.userservice.util.IdGenerator;
 import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -34,7 +35,7 @@ public class UserController {
             return ResponseEntity.badRequest().body(new ApiError("Username already exists"));
         }
 
-        String id = UUID.randomUUID().toString();
+        String id = IdGenerator.userIdFromUsername(username);
         User user = new User();
         user.setId(id);
         user.setUsername(username);

@@ -1,14 +1,17 @@
 import { useContext, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
-import { authApi, parseApiError } from "../api/api";
+import { Link, useNavigate } from "react-router-dom";
+import { authApi, parseApiError, userApi } from "../api/api";
 import { AuthContext } from "../context/AuthContext";
 
-export default function Login() {
+export default function Register() {
     const { login, authNotice, clearAuthNotice } = useContext(AuthContext);
     const navigate = useNavigate();
-    const location = useLocation();
 
-    const [form, setForm] = useState({ username: "", password: "" });
+    const [form, setForm] = useState({
+        username: "",
+        email: "",
+        password: "",
+    });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
 
@@ -18,11 +21,15 @@ export default function Login() {
         setError("");
 
         try {
-            const response = await authApi.post("/auth/login", form);
-            login(response.data);
-            navigate(location.state?.from || "/", { replace: true });
+            await userApi.post("/users/register", form);
+            const authResponse = await authApi.post("/auth/login", {
+                username: form.username,
+                password: form.password,
+            });
+            login(authResponse.data);
+            navigate("/", { replace: true });
         } catch (requestError) {
-            setError(parseApiError(requestError, "Unable to sign in"));
+            setError(parseApiError(requestError, "Unable to register"));
         } finally {
             setLoading(false);
         }
@@ -31,23 +38,23 @@ export default function Login() {
     return (
         <section className="auth-layout">
             <article className="auth-card auth-card-featured">
-                <p className="eyebrow">Welcome Back</p>
-                <h1>Sign In to the auction floor</h1>
+                <p className="eyebrow">Create an Account</p>
+                <h1>Join the cloud auction system</h1>
                 <p className="auth-lead">
-                    Access secure bidding, seller actions, live updates, and winner visibility in
-                    real time.
+                    Register once, then move directly into seller and bidder flows with a real JWT
+                    session.
                 </p>
                 <div className="feature-list">
-                    <div className="feature-pill">JWT-protected bidding</div>
-                    <div className="feature-pill">Live auction updates</div>
-                    <div className="feature-pill">Server-side winner resolution</div>
+                    <div className="feature-pill">Unique usernames</div>
+                    <div className="feature-pill">Seller and bidder access</div>
+                    <div className="feature-pill">Real-time event visibility</div>
                 </div>
             </article>
 
             <section className="auth-card">
                 <div className="section-heading">
-                    <h2>Sign In</h2>
-                    <p>Use your registered username and password to access auctions.</p>
+                    <h2>Create Account</h2>
+                    <p>Register a new auction account and start bidding immediately.</p>
                 </div>
 
                 <form className="form-stack" onSubmit={handleSubmit}>
@@ -63,7 +70,24 @@ export default function Login() {
                                 }))
                             }
                             onFocus={clearAuthNotice}
-                            placeholder="username"
+                            placeholder="choose a username"
+                        />
+                    </label>
+
+                    <label className="form-field">
+                        <span>Email</span>
+                        <input
+                            className="form-input"
+                            type="email"
+                            value={form.email}
+                            onChange={(event) =>
+                                setForm((previous) => ({
+                                    ...previous,
+                                    email: event.target.value,
+                                }))
+                            }
+                            onFocus={clearAuthNotice}
+                            placeholder="you@example.com"
                         />
                     </label>
 
@@ -80,7 +104,7 @@ export default function Login() {
                                 }))
                             }
                             onFocus={clearAuthNotice}
-                            placeholder="password"
+                            placeholder="minimum 8 characters"
                         />
                     </label>
 
@@ -88,12 +112,12 @@ export default function Login() {
                     {error ? <p className="status-error">{error}</p> : null}
 
                     <button className="primary-button" disabled={loading} type="submit">
-                        {loading ? "Signing in..." : "Sign In"}
+                        {loading ? "Creating account..." : "Register"}
                     </button>
                 </form>
 
                 <p className="auth-footer">
-                    Need an account? <Link to="/register">Register here</Link>.
+                    Already registered? <Link to="/login">Sign in</Link>.
                 </p>
             </section>
         </section>
