@@ -31,6 +31,7 @@ public class AuctionController {
             Auction auction = auctionService.createAuction(
                 request.getItemName(),
                 request.getSellerId(),
+                request.getImageDataUrl(),
                 httpRequest.getHeader("Authorization")
             );
             return ResponseEntity.status(HttpStatus.CREATED).body(auction);

@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS auctions (
     auction_id VARCHAR(64) PRIMARY KEY,
     item_name VARCHAR(255) NOT NULL,
     seller_id VARCHAR(64) NOT NULL,
+    image_data_url TEXT,
     start_time TIMESTAMPTZ NOT NULL,
     end_time TIMESTAMPTZ NOT NULL,
     cycle_number INT NOT NULL,
@@ -25,6 +26,9 @@ CREATE TABLE IF NOT EXISTS auctions (
     winner_user_id VARCHAR(64),
     finalized_at TIMESTAMPTZ
 );
+
+ALTER TABLE auctions
+ADD COLUMN IF NOT EXISTS image_data_url TEXT;
 
 CREATE INDEX IF NOT EXISTS idx_auctions_status_end_time
 ON auctions (status, end_time);

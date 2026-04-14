@@ -18,6 +18,10 @@ public class Auction {
     @Column(name = "seller_id", nullable = false)
     private String sellerId;
 
+    @Lob
+    @Column(name = "image_data_url")
+    private String imageDataUrl;
+
     @Column(name = "start_time", nullable = false)
     private Instant startTime;
 
@@ -62,6 +66,14 @@ public class Auction {
 
     public void setSellerId(String sellerId) {
         this.sellerId = sellerId;
+    }
+
+    public String getImageDataUrl() {
+        return imageDataUrl;
+    }
+
+    public void setImageDataUrl(String imageDataUrl) {
+        this.imageDataUrl = imageDataUrl;
     }
 
     public Instant getStartTime() {

@@ -2,13 +2,13 @@ package com.auction.userservice.config;
 
 import com.auction.userservice.model.User;
 import com.auction.userservice.repository.UserRepository;
+import com.auction.userservice.util.IdGenerator;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
-import java.util.UUID;
 
 @Configuration
 public class DemoUserSeeder {
@@ -25,7 +25,7 @@ public class DemoUserSeeder {
                           String username, String email, String password) {
         userRepository.findByUsernameIgnoreCase(username).orElseGet(() -> {
             User user = new User();
-            user.setId(UUID.randomUUID().toString());
+            user.setId(IdGenerator.userIdFromUsername(username));
             user.setUsername(username);
             user.setEmail(email);
             user.setPasswordHash(passwordEncoder.encode(password));

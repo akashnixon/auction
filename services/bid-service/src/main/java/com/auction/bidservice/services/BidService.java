@@ -109,6 +109,15 @@ public class BidService {
             return toResponse(alreadySaved, isCurrentHighest(alreadySaved));
         }
 
+        publishEvent("BID_PLACED", Map.of(
+            "auctionId", auctionId,
+            "cycleNumber", cycleNumber,
+            "bidderId", bid.getBidderId(),
+            "bidId", bid.getBidId(),
+            "amount", bid.getAmount(),
+            "receivedAt", bid.getReceivedAt()
+        ));
+
         Bid currentHighest = getHighestFromDatabase(auctionId, cycleNumber).orElse(null);
         cacheHighestBid(auctionId, cycleNumber, currentHighest);
 

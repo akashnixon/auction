@@ -8,6 +8,7 @@ public class AuctionStateResponse {
     private String auctionId;
     private String itemName;
     private String sellerId;
+    private String imageDataUrl;
     private AuctionStatus status;
     private int cycleNumber;
     private Instant startTime;
@@ -35,6 +36,14 @@ public class AuctionStateResponse {
 
     public void setSellerId(String sellerId) {
         this.sellerId = sellerId;
+    }
+
+    public String getImageDataUrl() {
+        return imageDataUrl;
+    }
+
+    public void setImageDataUrl(String imageDataUrl) {
+        this.imageDataUrl = imageDataUrl;
     }
 
     public AuctionStatus getStatus() {

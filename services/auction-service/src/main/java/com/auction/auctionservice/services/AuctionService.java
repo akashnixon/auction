@@ -7,6 +7,7 @@ import com.auction.auctionservice.dto.NotificationEventRequest;
 import com.auction.auctionservice.models.Auction;
 import com.auction.auctionservice.models.AuctionStatus;
 import com.auction.auctionservice.repositories.AuctionRepository;
+import com.auction.auctionservice.util.IdGenerator;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
@@ -48,7 +49,12 @@ public class AuctionService {
         this.restTemplate = restTemplate;
     }
 
-    public Auction createAuction(String itemName, String sellerId, String authorizationHeader) {
+    public Auction createAuction(
+        String itemName,
+        String sellerId,
+        String imageDataUrl,
+        String authorizationHeader
+    ) {
         if (itemName == null || itemName.isBlank()) {
             throw new IllegalArgumentException("itemName is required");
         }
@@ -58,9 +64,10 @@ public class AuctionService {
         ensureAuthenticatedActiveUser(authorizationHeader, sellerId, "seller");
 
         Auction auction = new Auction();
-        auction.setAuctionId(UUID.randomUUID().toString());
+        auction.setAuctionId(IdGenerator.auctionId(itemName));
         auction.setItemName(itemName.trim());
         auction.setSellerId(sellerId.trim());
+        auction.setImageDataUrl(imageDataUrl);
         auction.setCycleNumber(1);
         auction.setStartTime(Instant.now());
         auction.setEndTime(auction.getStartTime().plusSeconds(auctionDurationSeconds));
@@ -73,6 +80,7 @@ public class AuctionService {
             "auctionId", auction.getAuctionId(),
             "itemName", auction.getItemName(),
             "sellerId", auction.getSellerId(),
+            "imageDataUrl", auction.getImageDataUrl(),
             "cycleNumber", auction.getCycleNumber(),
             "startTime", auction.getStartTime().toString(),
             "endTime", auction.getEndTime().toString()
@@ -112,6 +120,7 @@ public class AuctionService {
         response.setAuctionId(auction.getAuctionId());
         response.setItemName(auction.getItemName());
         response.setSellerId(auction.getSellerId());
+        response.setImageDataUrl(auction.getImageDataUrl());
         response.setStatus(auction.getStatus());
         response.setCycleNumber(auction.getCycleNumber());
         response.setStartTime(auction.getStartTime());
@@ -153,6 +162,7 @@ public class AuctionService {
         payload.put("auctionId", auction.getAuctionId());
         payload.put("itemName", auction.getItemName());
         payload.put("sellerId", auction.getSellerId());
+        payload.put("imageDataUrl", auction.getImageDataUrl());
         payload.put("cycleNumber", auction.getCycleNumber());
         payload.put("startTime", auction.getStartTime().toString());
         payload.put("endTime", auction.getEndTime().toString());
@@ -173,6 +183,7 @@ public class AuctionService {
         payload.put("auctionId", auction.getAuctionId());
         payload.put("itemName", auction.getItemName());
         payload.put("sellerId", auction.getSellerId());
+        payload.put("imageDataUrl", auction.getImageDataUrl());
         payload.put("winnerUserId", winner.getBidderId());
         payload.put("winningBidId", winner.getBidId());
         payload.put("winningAmount", winner.getAmount());
