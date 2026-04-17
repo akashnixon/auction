@@ -118,19 +118,29 @@ Each service can also be built and run independently.
 For a step-by-step local run guide, see:
 
 - `docs/RUNNING.md`
+- `docs/DEPLOYMENT_GUIDE.md`
 
 Quick start from `main`:
 
-1. Start PostgreSQL and Redis.
-2. Initialize the database with `scripts/init-db.sql`.
-3. Start all five backend services.
-4. Start the Vite frontend in `frontend/`.
-5. Open `http://localhost:5173`.
+1. Run `docker compose up --build -d`.
+2. Open `http://localhost:8080`.
+3. Verify the `/health` endpoints on ports `3001` through `3005`.
 
 Current local demo behavior:
 - auctions run with a `30-second` window by default for faster demos
 - PostgreSQL is used for persistence
 - Redis is used for highest-bid caching
+
+## Kubernetes / Infra
+- Kubernetes manifests live under `infra/kubernetes/`
+- The frontend is exposed through ingress at `http://auction.localtest.me`
+- Backend APIs are routed through ingress path prefixes
+- `bid-service` includes an HPA for demo autoscaling
+
+## CI/CD
+- GitHub Actions workflow: `.github/workflows/ci.yml`
+- Container registry target: GitHub Container Registry (`ghcr.io`)
+- On pushes to `main`, the workflow can build and publish all six images
 
 ---
 

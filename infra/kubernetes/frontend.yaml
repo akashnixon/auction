@@ -1,63 +1,58 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: notification-service
+  name: frontend
   namespace: auction
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: notification-service
+      app: frontend
   template:
     metadata:
       labels:
-        app: notification-service
+        app: frontend
     spec:
       containers:
-        - name: notification-service
-          image: ghcr.io/your-github-username/auction-notification-service:latest
+        - name: frontend
+          image: ghcr.io/your-github-username/auction-frontend:latest
           ports:
-            - containerPort: 3005
+            - containerPort: 80
               name: http
           envFrom:
             - configMapRef:
                 name: auction-config
-            - secretRef:
-                name: auction-secrets
-          env:
-            - name: PORT
-              value: "3005"
           readinessProbe:
             httpGet:
-              path: /health
+              path: /
               port: http
-            initialDelaySeconds: 15
+            initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 3
           livenessProbe:
             httpGet:
-              path: /health
+              path: /
               port: http
-            initialDelaySeconds: 30
+            initialDelaySeconds: 20
             periodSeconds: 20
             timeoutSeconds: 3
           resources:
             requests:
-              cpu: 150m
-              memory: 256Mi
+              cpu: 50m
+              memory: 128Mi
             limits:
-              cpu: 750m
-              memory: 768Mi
+              cpu: 250m
+              memory: 256Mi
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: notification-service
+  name: frontend
   namespace: auction
 spec:
   selector:
-    app: notification-service
+    app: frontend
   ports:
     - name: http
-      port: 3005
+      port: 80
       targetPort: http

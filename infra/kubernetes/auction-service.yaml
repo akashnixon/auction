@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auction-service
+  namespace: auction
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: auction-service
+  template:
+    metadata:
+      labels:
+        app: auction-service
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          image: busybox:1.36
+          command:
+            - sh
+            - -c
+            - until nc -z postgres 5432; do sleep 2; done
+      containers:
+        - name: auction-service
+          image: ghcr.io/your-github-username/auction-auction-service:latest
+          ports:
+            - containerPort: 3003
+              name: http
+          envFrom:
+            - configMapRef:
+                name: auction-config
+            - secretRef:
+                name: auction-secrets
+          env:
+            - name: PORT
+              value: "3003"
+            - name: AUCTION_SCHEDULER_LEADER
+              value: "true"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            timeoutSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 40
+            periodSeconds: 20
+            timeoutSeconds: 3
+          resources:
+            requests:
+              cpu: 150m
+              memory: 256Mi
+            limits:
+              cpu: 750m
+              memory: 768Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: auction-service
+  namespace: auction
+spec:
+  selector:
+    app: auction-service
+  ports:
+    - name: http
+      port: 3003
+      targetPort: http

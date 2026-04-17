@@ -1,0 +1,192 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: postgres-init-sql
+  namespace: auction
+data:
+  init-db.sql: |
+    CREATE TABLE IF NOT EXISTS users (
+        id VARCHAR(64) PRIMARY KEY,
+        username VARCHAR(255) NOT NULL UNIQUE,
+        email VARCHAR(255) NOT NULL UNIQUE,
+        password_hash VARCHAR(255) NOT NULL,
+        is_active BOOLEAN NOT NULL,
+        is_selling BOOLEAN NOT NULL,
+        is_highest_bidder BOOLEAN NOT NULL,
+        created_at TIMESTAMPTZ NOT NULL,
+        deregistered_at TIMESTAMPTZ
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_users_username
+    ON users (username);
+
+    CREATE TABLE IF NOT EXISTS auctions (
+        auction_id VARCHAR(64) PRIMARY KEY,
+        item_name VARCHAR(255) NOT NULL,
+        seller_id VARCHAR(64) NOT NULL,
+        image_data_url TEXT,
+        start_time TIMESTAMPTZ NOT NULL,
+        end_time TIMESTAMPTZ NOT NULL,
+        cycle_number INT NOT NULL,
+        status VARCHAR(32) NOT NULL,
+        winning_bid_id VARCHAR(64),
+        winner_user_id VARCHAR(64),
+        finalized_at TIMESTAMPTZ
+    );
+
+    ALTER TABLE auctions
+    ADD COLUMN IF NOT EXISTS image_data_url TEXT;
+
+    CREATE INDEX IF NOT EXISTS idx_auctions_status_end_time
+    ON auctions (status, end_time);
+
+    CREATE TABLE IF NOT EXISTS bids (
+        bid_id VARCHAR(64) PRIMARY KEY,
+        auction_id VARCHAR(64) NOT NULL,
+        cycle_number INT NOT NULL,
+        bidder_id VARCHAR(64) NOT NULL,
+        amount NUMERIC(18, 2) NOT NULL,
+        received_at TIMESTAMPTZ NOT NULL,
+        idempotency_key VARCHAR(255) NOT NULL,
+        CONSTRAINT uk_bid_idempotency UNIQUE (auction_id, bidder_id, idempotency_key)
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_bids_auction_cycle_winner
+    ON bids (auction_id, cycle_number, amount DESC, received_at ASC, bid_id ASC);
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: auction
+spec:
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+  selector:
+    app: postgres
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: auction
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+              name: postgres
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: auction-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: auction-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auction-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: postgres-data
+              mountPath: /var/lib/postgresql/data
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"
+            initialDelaySeconds: 30
+            periodSeconds: 20
+            timeoutSeconds: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1
+              memory: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: postgres-data
+      spec:
+        accessModes:
+          - ReadWriteOnce
+        resources:
+          requests:
+            storage: 5Gi
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: postgres-init
+  namespace: auction
+spec:
+  backoffLimit: 4
+  template:
+    metadata:
+      labels:
+        app: postgres-init
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: postgres-init
+          image: postgres:16-alpine
+          command:
+            - sh
+            - -c
+            - |
+              until pg_isready -h postgres -U "$POSTGRES_USER" -d "$POSTGRES_DB"; do
+                sleep 2
+              done
+              psql "postgresql://$POSTGRES_USER:$POSTGRES_PASSWORD@postgres:5432/$POSTGRES_DB" -f /config/init-db.sql
+          env:
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: auction-secrets
+                  key: POSTGRES_DB
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: auction-secrets
+                  key: POSTGRES_USER
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: auction-secrets
+                  key: POSTGRES_PASSWORD
+          volumeMounts:
+            - name: init-sql
+              mountPath: /config
+      volumes:
+        - name: init-sql
+          configMap:
+            name: postgres-init-sql
