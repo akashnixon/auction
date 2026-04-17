@@ -28,7 +28,7 @@ spec:
             - until nc -z redis 6379; do sleep 2; done
       containers:
         - name: bid-service
-          image: ghcr.io/your-github-username/auction-bid-service:latest
+          image: ghcr.io/akashnixon/auction-bid-service:deployment
           ports:
             - containerPort: 3004
               name: http

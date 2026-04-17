@@ -22,7 +22,7 @@ spec:
             - until nc -z postgres 5432; do sleep 2; done
       containers:
         - name: auction-service
-          image: ghcr.io/your-github-username/auction-auction-service:latest
+          image: ghcr.io/akashnixon/auction-auction-service:deployment
           ports:
             - containerPort: 3003
               name: http

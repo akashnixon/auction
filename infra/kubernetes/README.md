@@ -19,7 +19,16 @@ This directory contains a demo-ready Kubernetes layout for the auction platform.
 `localtest.me` resolves to `127.0.0.1`, which makes it useful for local ingress demos.
 
 ## Image names
-Replace every `ghcr.io/your-github-username/...` image with your real registry path before deployment.
+The manifests are currently pinned to the `deployment` branch images published in GitHub Container Registry:
+
+- `ghcr.io/akashnixon/auction-user-service:deployment`
+- `ghcr.io/akashnixon/auction-auth-service:deployment`
+- `ghcr.io/akashnixon/auction-auction-service:deployment`
+- `ghcr.io/akashnixon/auction-bid-service:deployment`
+- `ghcr.io/akashnixon/auction-notification-service:deployment`
+- `ghcr.io/akashnixon/auction-frontend:deployment`
+
+If you later merge and publish stable `main` images, you can switch these tags to `latest` or to a commit-specific tag.
 
 ## Scaling guidance
 - Safe to scale horizontally:

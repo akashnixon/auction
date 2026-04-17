@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: auth-service
-          image: ghcr.io/your-github-username/auction-auth-service:latest
+          image: ghcr.io/akashnixon/auction-auth-service:deployment
           ports:
             - containerPort: 3002
               name: http

@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: frontend
-          image: ghcr.io/your-github-username/auction-frontend:latest
+          image: ghcr.io/akashnixon/auction-frontend:deployment
           ports:
             - containerPort: 80
               name: http

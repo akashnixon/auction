@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
         - name: notification-service
-          image: ghcr.io/your-github-username/auction-notification-service:latest
+          image: ghcr.io/akashnixon/auction-notification-service:deployment
           ports:
             - containerPort: 3005
               name: http
