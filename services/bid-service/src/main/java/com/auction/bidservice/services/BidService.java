@@ -90,6 +90,11 @@ public class BidService {
         }
 
         Bid previousHighest = getHighestFromDatabase(auctionId, cycleNumber).orElse(null);
+        if (previousHighest != null && amount.compareTo(previousHighest.getAmount()) < 0) {
+            throw new IllegalStateException(
+                "Bid must be at least the current highest bid of " + previousHighest.getAmount()
+            );
+        }
 
         Bid bid = new Bid();
         bid.setBidId(UUID.randomUUID().toString());

@@ -75,6 +75,30 @@ export default function AuctionDetail() {
         loadAuction();
     }, [latestRelevantEventId, loadAuction]);
 
+    useEffect(() => {
+        if (!auction || auction.status === "ENDED" || !auction.endTime) {
+            return undefined;
+        }
+
+        const endTimestamp = new Date(auction.endTime).getTime();
+        if (Number.isNaN(endTimestamp)) {
+            return undefined;
+        }
+
+        const remainingMs = endTimestamp - Date.now();
+        if (remainingMs > 0) {
+            const timeout = setTimeout(() => {
+                loadAuction();
+            }, remainingMs + 250);
+            return () => clearTimeout(timeout);
+        }
+
+        const interval = setInterval(() => {
+            loadAuction();
+        }, 2000);
+        return () => clearInterval(interval);
+    }, [auction, loadAuction]);
+
     const highestBid = getHighestBid(bids);
     const bidHistory = useMemo(
         () =>
@@ -100,6 +124,10 @@ export default function AuctionDetail() {
     const leadingBidderName = highestBid?.bidderId
         ? userLookup[highestBid.bidderId] || highestBid.bidderId
         : "No bids have been placed yet.";
+    const isAwaitingFinalization =
+        auction?.status === "ACTIVE" &&
+        auction?.endTime &&
+        new Date(auction.endTime).getTime() <= Date.now();
 
     const placeBid = async (amount) => {
         if (!user) {
@@ -279,6 +307,11 @@ export default function AuctionDetail() {
             <section className="panel detail-info-panel">
                 {refreshing ? (
                     <p className="muted-text subtle-refresh">Refreshing auction activity...</p>
+                ) : null}
+                {isAwaitingFinalization ? (
+                    <p className="muted-text subtle-refresh">
+                        Bidding has closed. Finalizing the winner now...
+                    </p>
                 ) : null}
                 <div className="detail-info-grid">
                     <div>
