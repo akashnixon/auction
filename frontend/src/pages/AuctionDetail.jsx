@@ -112,7 +112,9 @@ export default function AuctionDetail() {
     const metrics = useMemo(
         () => ({
             bids: bids.length,
-            highestBid: highestBid ? formatCurrency(highestBid.amount) : "No bids yet",
+            highestBid: highestBid
+                ? formatCurrency(highestBid.amount)
+                : formatCurrency(auction?.startingPrice ?? 0),
             closingTime: auction ? formatDateTime(auction.endTime) : "Unknown",
         }),
         [auction, bids.length, highestBid]
@@ -246,7 +248,7 @@ export default function AuctionDetail() {
 
                     <div className="detail-summary-grid">
                         <div>
-                            <span>Current bid</span>
+                            <span>{highestBid ? "Current bid" : "Starting price"}</span>
                             <strong>{metrics.highestBid}</strong>
                         </div>
                         <div>
@@ -270,7 +272,13 @@ export default function AuctionDetail() {
                     <div className="bid-panel-card">
                         <h2>{auction.status === "ENDED" ? "Final result" : "Place a bid"}</h2>
                         <div className="bid-panel-price">
-                            <span>{auction.status === "ENDED" ? "Winning bid" : "Current bid"}</span>
+                            <span>
+                                {auction.status === "ENDED"
+                                    ? "Winning bid"
+                                    : highestBid
+                                      ? "Current bid"
+                                      : "Starting price"}
+                            </span>
                             <strong>{metrics.highestBid}</strong>
                         </div>
                         <p className="muted-text">

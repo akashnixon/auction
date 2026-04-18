@@ -540,8 +540,11 @@ p {
   background: var(--surface-alt);
   border: 1px solid var(--line);
   border-radius: 12px;
-  min-height: 220px;
+  justify-self: start;
+  max-width: 280px;
+  min-height: 160px;
   overflow: hidden;
+  width: 100%;
 }
 
 .detail-info-panel {

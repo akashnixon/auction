@@ -2,6 +2,7 @@ package com.auction.auctionservice.dto;
 
 import com.auction.auctionservice.models.AuctionStatus;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 public class AuctionStateResponse {
@@ -9,6 +10,7 @@ public class AuctionStateResponse {
     private String itemName;
     private String sellerId;
     private String imageDataUrl;
+    private BigDecimal startingPrice;
     private AuctionStatus status;
     private int cycleNumber;
     private Instant startTime;
@@ -44,6 +46,14 @@ public class AuctionStateResponse {
 
     public void setImageDataUrl(String imageDataUrl) {
         this.imageDataUrl = imageDataUrl;
+    }
+
+    public BigDecimal getStartingPrice() {
+        return startingPrice;
+    }
+
+    public void setStartingPrice(BigDecimal startingPrice) {
+        this.startingPrice = startingPrice;
     }
 
     public AuctionStatus getStatus() {

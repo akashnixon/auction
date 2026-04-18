@@ -2,6 +2,7 @@ package com.auction.auctionservice.models;
 
 import jakarta.persistence.*;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 @Entity
@@ -21,6 +22,9 @@ public class Auction {
     @Lob
     @Column(name = "image_data_url")
     private String imageDataUrl;
+
+    @Column(name = "starting_price", nullable = false)
+    private BigDecimal startingPrice;
 
     @Column(name = "start_time", nullable = false)
     private Instant startTime;
@@ -74,6 +78,14 @@ public class Auction {
 
     public void setImageDataUrl(String imageDataUrl) {
         this.imageDataUrl = imageDataUrl;
+    }
+
+    public BigDecimal getStartingPrice() {
+        return startingPrice;
+    }
+
+    public void setStartingPrice(BigDecimal startingPrice) {
+        this.startingPrice = startingPrice;
     }
 
     public Instant getStartTime() {

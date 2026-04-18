@@ -17,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -53,6 +54,7 @@ public class AuctionService {
         String itemName,
         String sellerId,
         String imageDataUrl,
+        Double startingPrice,
         String authorizationHeader
     ) {
         if (itemName == null || itemName.isBlank()) {
@@ -61,6 +63,9 @@ public class AuctionService {
         if (sellerId == null || sellerId.isBlank()) {
             throw new IllegalArgumentException("sellerId is required");
         }
+        if (startingPrice == null || startingPrice < 0) {
+            throw new IllegalArgumentException("startingPrice must be zero or greater");
+        }
         ensureAuthenticatedActiveUser(authorizationHeader, sellerId, "seller");
 
         Auction auction = new Auction();
@@ -68,6 +73,7 @@ public class AuctionService {
         auction.setItemName(itemName.trim());
         auction.setSellerId(sellerId.trim());
         auction.setImageDataUrl(imageDataUrl);
+        auction.setStartingPrice(BigDecimal.valueOf(startingPrice));
         auction.setCycleNumber(1);
         auction.setStartTime(Instant.now());
         auction.setEndTime(auction.getStartTime().plusSeconds(auctionDurationSeconds));
@@ -81,6 +87,7 @@ public class AuctionService {
             "itemName", auction.getItemName(),
             "sellerId", auction.getSellerId(),
             "imageDataUrl", auction.getImageDataUrl(),
+            "startingPrice", auction.getStartingPrice(),
             "cycleNumber", auction.getCycleNumber(),
             "startTime", auction.getStartTime().toString(),
             "endTime", auction.getEndTime().toString()
@@ -121,6 +128,7 @@ public class AuctionService {
         response.setItemName(auction.getItemName());
         response.setSellerId(auction.getSellerId());
         response.setImageDataUrl(auction.getImageDataUrl());
+        response.setStartingPrice(auction.getStartingPrice());
         response.setStatus(auction.getStatus());
         response.setCycleNumber(auction.getCycleNumber());
         response.setStartTime(auction.getStartTime());
@@ -163,6 +171,7 @@ public class AuctionService {
         payload.put("itemName", auction.getItemName());
         payload.put("sellerId", auction.getSellerId());
         payload.put("imageDataUrl", auction.getImageDataUrl());
+        payload.put("startingPrice", auction.getStartingPrice());
         payload.put("cycleNumber", auction.getCycleNumber());
         payload.put("startTime", auction.getStartTime().toString());
         payload.put("endTime", auction.getEndTime().toString());
@@ -184,6 +193,7 @@ public class AuctionService {
         payload.put("itemName", auction.getItemName());
         payload.put("sellerId", auction.getSellerId());
         payload.put("imageDataUrl", auction.getImageDataUrl());
+        payload.put("startingPrice", auction.getStartingPrice());
         payload.put("winnerUserId", winner.getBidderId());
         payload.put("winningBidId", winner.getBidId());
         payload.put("winningAmount", winner.getAmount());
