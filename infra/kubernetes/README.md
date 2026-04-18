@@ -1,11 +1,11 @@
 # Kubernetes Deployment Notes
 
-This directory contains a demo-ready Kubernetes layout for the auction platform.
+This directory contains a cloud-ready Kubernetes layout for the auction platform.
 
 ## What is included
 - `namespaces.yaml`: dedicated `auction` namespace
 - `configmap.yaml`: non-secret runtime configuration
-- `secret.yaml`: demo secret values for PostgreSQL and JWT
+- `secret.yaml`: placeholder secret manifest that must be replaced with real values before deployment
 - `database.yaml`: PostgreSQL StatefulSet, service, and schema-init job
 - `redis.yaml`: Redis deployment and service
 - `*-service.yaml`: deployment and service per backend microservice
@@ -30,6 +30,11 @@ The manifests are currently pinned to the `deployment` branch images published i
 
 If you later merge and publish stable `main` images, you can switch these tags to `latest` or to a commit-specific tag.
 
+## Production notes
+- Replace every placeholder in `secret.yaml` before applying these manifests.
+- For real cloud deployments, prefer your platform secret manager or an operator such as External Secrets instead of committing live values.
+- `AUCTION_DURATION_SECONDS` is set to `300` here to match the project specification. Local Docker demo flows can still use shorter durations.
+
 ## Scaling guidance
 - Safe to scale horizontally:
   `frontend`, `user-service`, `auth-service`, `bid-service`
@@ -43,4 +48,17 @@ If you later merge and publish stable `main` images, you can switch these tags t
 kubectl apply -f infra/kubernetes/namespaces.yaml
 kubectl apply -k infra/kubernetes
 kubectl -n auction wait --for=condition=complete job/postgres-init --timeout=180s
+```
+
+## Secret bootstrap example
+Before applying the bundle, either update `secret.yaml` directly for a private environment or create a runtime secret out-of-band:
+
+```bash
+kubectl -n auction create secret generic auction-secrets \
+  --from-literal=DB_USER=auction \
+  --from-literal=DB_PASSWORD='<strong-db-password>' \
+  --from-literal=JWT_SECRET='<strong-jwt-secret>' \
+  --from-literal=POSTGRES_DB=auction \
+  --from-literal=POSTGRES_USER=auction \
+  --from-literal=POSTGRES_PASSWORD='<strong-postgres-password>'
 ```

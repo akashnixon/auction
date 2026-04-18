@@ -5,6 +5,10 @@ metadata:
   namespace: auction
 spec:
   replicas: 1
+  revisionHistoryLimit: 2
+  minReadySeconds: 10
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: notification-service
@@ -13,6 +17,10 @@ spec:
       labels:
         app: notification-service
     spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: notification-service
           image: ghcr.io/akashnixon/auction-notification-service:deployment
@@ -61,3 +69,4 @@ spec:
     - name: http
       port: 3005
       targetPort: http
+  type: ClusterIP

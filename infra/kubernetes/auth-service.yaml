@@ -4,7 +4,14 @@ metadata:
   name: auth-service
   namespace: auction
 spec:
-  replicas: 1
+  replicas: 2
+  revisionHistoryLimit: 2
+  minReadySeconds: 10
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
   selector:
     matchLabels:
       app: auth-service
@@ -13,6 +20,10 @@ spec:
       labels:
         app: auth-service
     spec:
+      terminationGracePeriodSeconds: 30
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: auth-service
           image: ghcr.io/akashnixon/auction-auth-service:deployment
@@ -61,3 +72,4 @@ spec:
     - name: http
       port: 3002
       targetPort: http
+  type: ClusterIP
