@@ -82,16 +82,7 @@ public class AuctionService {
         auction = auctionRepository.save(auction);
 
         updateSellerStatus(sellerId, true, auction.getAuctionId());
-        broadcastEvent("AUCTION_ADVERTISED", Map.of(
-            "auctionId", auction.getAuctionId(),
-            "itemName", auction.getItemName(),
-            "sellerId", auction.getSellerId(),
-            "imageDataUrl", auction.getImageDataUrl(),
-            "startingPrice", auction.getStartingPrice(),
-            "cycleNumber", auction.getCycleNumber(),
-            "startTime", auction.getStartTime().toString(),
-            "endTime", auction.getEndTime().toString()
-        ));
+        broadcastEvent("AUCTION_ADVERTISED", buildAuctionEventPayload(auction));
 
         return auction;
     }
@@ -166,15 +157,7 @@ public class AuctionService {
         auction.setEndTime(auction.getStartTime().plusSeconds(auctionDurationSeconds));
         auctionRepository.save(auction);
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("auctionId", auction.getAuctionId());
-        payload.put("itemName", auction.getItemName());
-        payload.put("sellerId", auction.getSellerId());
-        payload.put("imageDataUrl", auction.getImageDataUrl());
-        payload.put("startingPrice", auction.getStartingPrice());
-        payload.put("cycleNumber", auction.getCycleNumber());
-        payload.put("startTime", auction.getStartTime().toString());
-        payload.put("endTime", auction.getEndTime().toString());
+        Map<String, Object> payload = buildAuctionEventPayload(auction);
         broadcastEvent("AUCTION_RESTARTED", payload);
     }
 
@@ -188,16 +171,10 @@ public class AuctionService {
         updateSellerStatus(auction.getSellerId(), false, auction.getAuctionId());
         closeAuctionInBidService(auction.getAuctionId(), auction.getCycleNumber());
 
-        Map<String, Object> payload = new HashMap<>();
-        payload.put("auctionId", auction.getAuctionId());
-        payload.put("itemName", auction.getItemName());
-        payload.put("sellerId", auction.getSellerId());
-        payload.put("imageDataUrl", auction.getImageDataUrl());
-        payload.put("startingPrice", auction.getStartingPrice());
+        Map<String, Object> payload = buildAuctionEventPayload(auction);
         payload.put("winnerUserId", winner.getBidderId());
         payload.put("winningBidId", winner.getBidId());
         payload.put("winningAmount", winner.getAmount());
-        payload.put("cycleNumber", auction.getCycleNumber());
         payload.put("finalizedAt", auction.getFinalizedAt().toString());
 
         broadcastEvent("AUCTION_FINALIZED", payload);
@@ -295,6 +272,19 @@ public class AuctionService {
             return "";
         }
         return Character.toUpperCase(value.charAt(0)) + value.substring(1);
+    }
+
+    private Map<String, Object> buildAuctionEventPayload(Auction auction) {
+        Map<String, Object> payload = new HashMap<>();
+        payload.put("auctionId", auction.getAuctionId());
+        payload.put("itemName", auction.getItemName());
+        payload.put("sellerId", auction.getSellerId());
+        payload.put("imageDataUrl", auction.getImageDataUrl());
+        payload.put("startingPrice", auction.getStartingPrice());
+        payload.put("cycleNumber", auction.getCycleNumber());
+        payload.put("startTime", auction.getStartTime() == null ? null : auction.getStartTime().toString());
+        payload.put("endTime", auction.getEndTime() == null ? null : auction.getEndTime().toString());
+        return payload;
     }
 
     private void updateSellerStatus(String userId, boolean isSelling, String auctionId) {

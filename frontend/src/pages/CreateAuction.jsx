@@ -58,7 +58,7 @@ export default function CreateAuction() {
     const { user } = useContext(AuthContext);
     const navigate = useNavigate();
     const [itemName, setItemName] = useState("");
-    const [startingPrice, setStartingPrice] = useState("0");
+    const [startingPrice, setStartingPrice] = useState("");
     const [imageDataUrl, setImageDataUrl] = useState("");
     const [error, setError] = useState("");
     const [imageError, setImageError] = useState("");
