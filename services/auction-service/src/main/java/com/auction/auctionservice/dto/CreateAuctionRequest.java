@@ -4,6 +4,7 @@ public class CreateAuctionRequest {
     private String itemName;
     private String sellerId;
     private String imageDataUrl;
+    private Double startingPrice;
 
     public String getItemName() {
         return itemName;
@@ -27,5 +28,13 @@ public class CreateAuctionRequest {
 
     public void setImageDataUrl(String imageDataUrl) {
         this.imageDataUrl = imageDataUrl;
+    }
+
+    public Double getStartingPrice() {
+        return startingPrice;
+    }
+
+    public void setStartingPrice(Double startingPrice) {
+        this.startingPrice = startingPrice;
     }
 }

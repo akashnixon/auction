@@ -1,12 +1,28 @@
 import axios from "axios";
 
+const runtimeConfig = window.__APP_CONFIG__ || {};
+
 const config = {
-    user: import.meta.env.VITE_USER_API_URL || "http://localhost:3001",
-    auth: import.meta.env.VITE_AUTH_API_URL || "http://localhost:3002",
-    auction: import.meta.env.VITE_AUCTION_API_URL || "http://localhost:3003",
-    bid: import.meta.env.VITE_BID_API_URL || "http://localhost:3004",
+    user:
+        runtimeConfig.USER_API_URL ||
+        import.meta.env.VITE_USER_API_URL ||
+        "http://localhost:3001",
+    auth:
+        runtimeConfig.AUTH_API_URL ||
+        import.meta.env.VITE_AUTH_API_URL ||
+        "http://localhost:3002",
+    auction:
+        runtimeConfig.AUCTION_API_URL ||
+        import.meta.env.VITE_AUCTION_API_URL ||
+        "http://localhost:3003",
+    bid:
+        runtimeConfig.BID_API_URL ||
+        import.meta.env.VITE_BID_API_URL ||
+        "http://localhost:3004",
     notification:
-        import.meta.env.VITE_NOTIFICATION_API_URL || "http://localhost:3005",
+        runtimeConfig.NOTIFICATION_API_URL ||
+        import.meta.env.VITE_NOTIFICATION_API_URL ||
+        "http://localhost:3005",
 };
 
 const createClient = (baseURL) => axios.create({ baseURL });

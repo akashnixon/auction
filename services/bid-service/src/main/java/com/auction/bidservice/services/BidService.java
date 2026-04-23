@@ -83,6 +83,7 @@ public class BidService {
         }
 
         int cycleNumber = ((Number) auctionState.get("cycleNumber")).intValue();
+        BigDecimal startingPrice = extractStartingPrice(auctionState);
 
         Optional<Bid> existing = bidRepository.findByAuctionIdAndBidderIdAndIdempotencyKey(auctionId, bidderId, idempotencyKey);
         if (existing.isPresent()) {
@@ -90,6 +91,16 @@ public class BidService {
         }
 
         Bid previousHighest = getHighestFromDatabase(auctionId, cycleNumber).orElse(null);
+        if (previousHighest == null && amount.compareTo(startingPrice) < 0) {
+            throw new IllegalStateException(
+                "Bid must be at least the starting price of " + startingPrice
+            );
+        }
+        if (previousHighest != null && amount.compareTo(previousHighest.getAmount()) < 0) {
+            throw new IllegalStateException(
+                "Bid must be at least the current highest bid of " + previousHighest.getAmount()
+            );
+        }
 
         Bid bid = new Bid();
         bid.setBidId(UUID.randomUUID().toString());
@@ -235,6 +246,14 @@ public class BidService {
     private Optional<Bid> getHighestFromDatabase(String auctionId, int cycleNumber) {
         List<Bid> ordered = bidRepository.findHighestForCycleOrdered(auctionId, cycleNumber);
         return ordered.isEmpty() ? Optional.empty() : Optional.of(ordered.get(0));
+    }
+
+    private BigDecimal extractStartingPrice(Map<?, ?> auctionState) {
+        Object raw = auctionState.get("startingPrice");
+        if (raw == null) {
+            return BigDecimal.ZERO;
+        }
+        return new BigDecimal(String.valueOf(raw));
     }
 
     private boolean isCurrentHighest(Bid bid) {

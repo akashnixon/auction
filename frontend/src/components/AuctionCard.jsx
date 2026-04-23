@@ -9,7 +9,7 @@ export default function AuctionCard({ auction }) {
     const winner = auction.winnerName || auction.winnerUserId || "Pending";
     const bidLabel = auction.highestBid
         ? formatCurrency(auction.highestBid.amount)
-        : "No bids yet";
+        : formatCurrency(auction.startingPrice ?? 0);
     const statusLabel = auction.status === "ENDED" ? "Auction ended" : "Auction live";
     const sellerLabel = auction.sellerName || auction.sellerId;
 
@@ -39,7 +39,13 @@ export default function AuctionCard({ auction }) {
 
                     <div className="auction-card-footer">
                         <div className="auction-price-block">
-                            <span>{auction.status === "ENDED" ? "Winning bid" : "Current bid"}</span>
+                            <span>
+                                {auction.status === "ENDED"
+                                    ? "Winning bid"
+                                    : auction.highestBid
+                                      ? "Current bid"
+                                      : "Starting price"}
+                            </span>
                             <strong>{bidLabel}</strong>
                             <small>{auction.status === "ENDED" ? "Closed" : "Open now"}</small>
                         </div>

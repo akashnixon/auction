@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS auctions (
     item_name VARCHAR(255) NOT NULL,
     seller_id VARCHAR(64) NOT NULL,
     image_data_url TEXT,
+    starting_price NUMERIC(18, 2) NOT NULL DEFAULT 0,
     start_time TIMESTAMPTZ NOT NULL,
     end_time TIMESTAMPTZ NOT NULL,
     cycle_number INT NOT NULL,
@@ -29,6 +30,9 @@ CREATE TABLE IF NOT EXISTS auctions (
 
 ALTER TABLE auctions
 ADD COLUMN IF NOT EXISTS image_data_url TEXT;
+
+ALTER TABLE auctions
+ADD COLUMN IF NOT EXISTS starting_price NUMERIC(18, 2) NOT NULL DEFAULT 0;
 
 CREATE INDEX IF NOT EXISTS idx_auctions_status_end_time
 ON auctions (status, end_time);

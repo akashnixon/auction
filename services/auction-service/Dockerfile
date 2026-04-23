@@ -1,11 +1,23 @@
 FROM maven:3.9.6-eclipse-temurin-17 AS build
+
 WORKDIR /app
-COPY pom.xml .
+
+COPY pom.xml ./
 COPY src ./src
+
 RUN mvn -q -DskipTests package
 
 FROM eclipse-temurin:17-jre
+
 WORKDIR /app
-COPY --from=build /app/target/auction-service-0.0.1-SNAPSHOT.jar app.jar
+
+RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /app/target/*.jar /app/app.jar
+
 EXPOSE 3003
-ENTRYPOINT ["java", "-jar", "app.jar"]
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -f http://localhost:3003/health || exit 1
+
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]

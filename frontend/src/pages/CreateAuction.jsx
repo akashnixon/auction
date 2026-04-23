@@ -58,6 +58,7 @@ export default function CreateAuction() {
     const { user } = useContext(AuthContext);
     const navigate = useNavigate();
     const [itemName, setItemName] = useState("");
+    const [startingPrice, setStartingPrice] = useState("");
     const [imageDataUrl, setImageDataUrl] = useState("");
     const [error, setError] = useState("");
     const [imageError, setImageError] = useState("");
@@ -104,6 +105,7 @@ export default function CreateAuction() {
                 itemName,
                 sellerId: user.userId,
                 imageDataUrl: imageDataUrl || null,
+                startingPrice: Number(startingPrice),
             });
             navigate(`/auction/${response.data.auctionId}`);
         } catch (requestError) {
@@ -130,6 +132,19 @@ export default function CreateAuction() {
                             value={itemName}
                             onChange={(event) => setItemName(event.target.value)}
                             placeholder="Vintage watch, gaming console, signed jersey..."
+                        />
+                    </label>
+
+                    <label className="form-field">
+                        <span>Starting Price</span>
+                        <input
+                            className="form-input"
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={startingPrice}
+                            onChange={(event) => setStartingPrice(event.target.value)}
+                            placeholder="0.00"
                         />
                     </label>
 
@@ -162,7 +177,13 @@ export default function CreateAuction() {
 
                     <button
                         className="primary-button"
-                        disabled={loading || processingImage || !itemName.trim()}
+                        disabled={
+                            loading ||
+                            processingImage ||
+                            !itemName.trim() ||
+                            startingPrice === "" ||
+                            Number(startingPrice) < 0
+                        }
                         type="submit"
                     >
                         {loading ? "Creating..." : "Create Auction"}
