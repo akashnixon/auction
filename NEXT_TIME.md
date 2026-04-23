@@ -206,27 +206,23 @@ From the repo root:
 
 ```powershell
 cd C:\Users\ARVIND\OneDrive\Desktop\691\auction
-kubectl apply -f infra/kubernetes/namespaces.yaml
-kubectl apply -k infra/kubernetes
+bash ./scripts/deploy-aks.sh
 ```
 
-## 11. Important Postgres Fix
+What this does:
+- validates Kubernetes manifests
+- checks that the AKS runtime secret exists
+- reruns the `postgres-init` database migration job
+- applies the Kubernetes manifests
+- restarts the app deployments so they pull the latest GHCR images
+- waits for rollouts to complete
+
+## 11. Important Postgres Note
 
 The Postgres manifest includes the Azure disk fix using:
 - `PGDATA=/var/lib/postgresql/data/pgdata`
 
-After deployment, apply the database file again and restart the Postgres pod to ensure the fix is active:
-
-```powershell
-kubectl apply -f infra/kubernetes/database.yaml
-kubectl delete pod postgres-0 -n auction
-```
-
-Watch pod status:
-
-```powershell
-kubectl get pods -n auction -w
-```
+Do not manually rerun the old Postgres fix commands unless you are intentionally rebuilding the database. The deploy script now handles the database migration job safely.
 
 ## 12. If The Cluster Needs More Capacity
 
@@ -365,7 +361,12 @@ If you need a full redeploy in the same cluster:
 ```powershell
 kubectl delete namespace auction
 kubectl apply -f infra/kubernetes/namespaces.yaml
-kubectl apply -k infra/kubernetes
-kubectl apply -f infra/kubernetes/database.yaml
-kubectl delete pod postgres-0 -n auction
+kubectl -n auction create secret generic auction-secrets `
+  --from-literal=DB_USER=auction `
+  --from-literal=DB_PASSWORD='<db-password>' `
+  --from-literal=JWT_SECRET='<jwt-secret>' `
+  --from-literal=POSTGRES_DB=auction `
+  --from-literal=POSTGRES_USER=auction `
+  --from-literal=POSTGRES_PASSWORD='<postgres-password>'
+bash ./scripts/deploy-aks.sh
 ```

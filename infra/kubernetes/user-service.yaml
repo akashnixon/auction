@@ -34,6 +34,7 @@ spec:
       containers:
         - name: user-service
           image: ghcr.io/akashnixon/auction-user-service:deployment
+          imagePullPolicy: Always
           ports:
             - containerPort: 3001
               name: http

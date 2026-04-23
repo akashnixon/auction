@@ -71,15 +71,28 @@ Then open:
 
 ## Kubernetes Demo
 
-### 1. Update image names
-Replace `ghcr.io/your-github-username/...` in `infra/kubernetes/` with your real registry paths.
+### 1. Create the runtime secret once
+The committed `secret.yaml` is only an example. Create the real AKS secret before deploying:
 
-### 2. Apply manifests
 ```bash
 kubectl apply -f infra/kubernetes/namespaces.yaml
-kubectl apply -k infra/kubernetes
-kubectl -n auction wait --for=condition=complete job/postgres-init --timeout=180s
+kubectl -n auction create secret generic auction-secrets \
+  --from-literal=DB_USER=auction \
+  --from-literal=DB_PASSWORD='<db-password>' \
+  --from-literal=JWT_SECRET='<jwt-secret>' \
+  --from-literal=POSTGRES_DB=auction \
+  --from-literal=POSTGRES_USER=auction \
+  --from-literal=POSTGRES_PASSWORD='<postgres-password>'
 ```
+
+### 2. Deploy or update AKS
+Use the deploy script for repeat deployments:
+
+```bash
+./scripts/deploy-aks.sh
+```
+
+The script validates manifests, reruns the database migration job, restarts deployments so mutable branch images are pulled again, and waits for rollouts.
 
 ### 3. Open the ingress host
 Use:

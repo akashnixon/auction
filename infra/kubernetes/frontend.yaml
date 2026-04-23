@@ -27,6 +27,7 @@ spec:
       containers:
         - name: frontend
           image: ghcr.io/akashnixon/auction-frontend:deployment
+          imagePullPolicy: Always
           ports:
             - containerPort: 80
               name: http

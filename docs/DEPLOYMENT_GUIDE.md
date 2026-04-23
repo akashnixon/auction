@@ -6,8 +6,8 @@ This guide is meant for a first deployment pass and matches the repo changes in 
 1. Get the Docker Compose demo working locally.
 2. Push the repo to GitHub.
 3. Let GitHub Actions build and publish container images to GHCR.
-4. Replace the placeholder image names in `infra/kubernetes/`.
-5. Deploy the Kubernetes manifests to your cluster.
+4. Create the real `auction-secrets` secret in AKS.
+5. Run `./scripts/deploy-aks.sh`.
 6. Verify health endpoints, frontend access, database connectivity, Redis connectivity, and live notifications.
 
 ## Which is easier: push manually or use GitHub Actions?
@@ -24,7 +24,7 @@ Manual pushing is still possible, but it is more repetitive and easier to miscon
 
 ## What GitHub Actions does not do automatically
 
-The workflow in this repo does not perform a cloud deployment yet because that step depends on your cloud provider and credentials.
+The workflow builds and validates the project, but it does not directly deploy to Azure because that requires AKS credentials and a runtime secret. Use `./scripts/deploy-aks.sh` from a machine where `kubectl` is already connected to the AKS cluster.
 
 You still need to choose one of:
 - AKS

@@ -40,6 +40,7 @@ spec:
       containers:
         - name: bid-service
           image: ghcr.io/akashnixon/auction-bid-service:deployment
+          imagePullPolicy: Always
           ports:
             - containerPort: 3004
               name: http

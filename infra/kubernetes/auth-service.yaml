@@ -27,6 +27,7 @@ spec:
       containers:
         - name: auth-service
           image: ghcr.io/akashnixon/auction-auth-service:deployment
+          imagePullPolicy: Always
           ports:
             - containerPort: 3002
               name: http

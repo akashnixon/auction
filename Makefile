@@ -1,6 +1,6 @@
 COMPOSE ?= docker compose
 
-.PHONY: compose-up compose-down compose-logs compose-dev validate-k8s
+.PHONY: compose-up compose-down compose-logs compose-dev validate-k8s deploy-aks
 
 compose-up:
 	$(COMPOSE) up --build -d
@@ -16,3 +16,6 @@ compose-dev:
 
 validate-k8s:
 	kubectl apply --dry-run=client -k infra/kubernetes
+
+deploy-aks:
+	./scripts/deploy-aks.sh

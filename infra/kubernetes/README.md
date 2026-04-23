@@ -5,7 +5,7 @@ This directory contains a cloud-ready Kubernetes layout for the auction platform
 ## What is included
 - `namespaces.yaml`: dedicated `auction` namespace
 - `configmap.yaml`: non-secret runtime configuration
-- `secret.yaml`: placeholder secret manifest that must be replaced with real values before deployment
+- `secret.yaml`: placeholder example only; the deploy script expects a real runtime secret in AKS
 - `database.yaml`: PostgreSQL StatefulSet, service, and schema-init job
 - `redis.yaml`: Redis deployment and service
 - `*-service.yaml`: deployment and service per backend microservice
@@ -43,15 +43,29 @@ If you later merge and publish stable `main` images, you can switch these tags t
 - Not safe to scale horizontally in the current implementation:
   `notification-service`, because SSE clients and buffered event history are stored in-memory per pod
 
-## Suggested apply order
+## Suggested deploy command
+Use the deploy script for repeat Azure deployments. It validates manifests, reruns the database migration job, restarts services so they pull the latest branch images, and waits for rollouts:
+
+```bash
+./scripts/deploy-aks.sh
+```
+
+or:
+
+```bash
+make deploy-aks
+```
+
+## Manual apply order
 ```bash
 kubectl apply -f infra/kubernetes/namespaces.yaml
+kubectl -n auction delete job postgres-init --ignore-not-found
 kubectl apply -k infra/kubernetes
 kubectl -n auction wait --for=condition=complete job/postgres-init --timeout=180s
 ```
 
 ## Secret bootstrap example
-Before applying the bundle, either update `secret.yaml` directly for a private environment or create a runtime secret out-of-band:
+Before applying the bundle, create a runtime secret out-of-band. The committed `secret.yaml` is an example and is not included by `kustomization.yaml`, which prevents placeholder values from overwriting real Azure secrets.
 
 ```bash
 kubectl -n auction create secret generic auction-secrets \
