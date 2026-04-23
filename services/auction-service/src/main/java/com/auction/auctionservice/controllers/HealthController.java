@@ -11,7 +11,7 @@ import java.util.Map;
 @RestController
 public class HealthController {
 
-    @Value("${auction.duration-seconds:300}")
+    @Value("${auction.duration-seconds:30}")
     private long auctionDurationSeconds;
 
     @GetMapping("/health")

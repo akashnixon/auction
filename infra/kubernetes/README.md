@@ -33,7 +33,7 @@ If you later merge and publish stable `main` images, you can switch these tags t
 ## Production notes
 - Replace every placeholder in `secret.yaml` before applying these manifests.
 - For real cloud deployments, prefer your platform secret manager or an operator such as External Secrets instead of committing live values.
-- `AUCTION_DURATION_SECONDS` is set to `300` here to match the project specification. Local Docker demo flows can still use shorter durations.
+- `AUCTION_DURATION_SECONDS` is set to `30` for faster prototype demos. Change it to `300` for strict project-spec timing.
 
 ## Scaling guidance
 - Safe to scale horizontally:

@@ -42,7 +42,7 @@ public class AuctionService {
     @Value("${services.auth.base-url:http://localhost:3002}")
     private String authServiceBaseUrl;
 
-    @Value("${auction.duration-seconds:300}")
+    @Value("${auction.duration-seconds:30}")
     private long auctionDurationSeconds;
 
     public AuctionService(AuctionRepository auctionRepository, RestTemplate restTemplate) {
