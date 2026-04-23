@@ -4,8 +4,6 @@ namespace: auction
 resources:
   - namespaces.yaml
   - configmap.yaml
-  - secret.yaml
-  - database.yaml
   - redis.yaml
   - user-service.yaml
   - auth-service.yaml

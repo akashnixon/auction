@@ -2,6 +2,8 @@ services:
   postgres:
     image: postgres:16-alpine
     container_name: auction-postgres
+    profiles:
+      - local-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: auction
@@ -20,6 +22,8 @@ services:
 
   postgres-init:
     image: postgres:16-alpine
+    profiles:
+      - local-db
     depends_on:
       postgres:
         condition: service_healthy
@@ -56,14 +60,11 @@ services:
       context: ./services/user-service
     image: auction/user-service:local
     restart: unless-stopped
-    depends_on:
-      postgres-init:
-        condition: service_completed_successfully
     environment:
       PORT: 3001
-      DB_URL: jdbc:postgresql://postgres:5432/auction
-      DB_USER: auction
-      DB_PASSWORD: auction
+      DB_URL: ${DB_URL:-jdbc:postgresql://auction-691.postgres.database.azure.com:5432/auction?sslmode=require}
+      DB_USER: ${DB_USER:-arvind}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in a local .env file}
       APP_CORS_ALLOWED_ORIGINS: http://localhost:8080,http://127.0.0.1:8080,http://localhost:5173,http://127.0.0.1:5173
     ports:
       - "3001:3001"
@@ -91,8 +92,6 @@ services:
     image: auction/auction-service:local
     restart: unless-stopped
     depends_on:
-      postgres-init:
-        condition: service_completed_successfully
       user-service:
         condition: service_healthy
       auth-service:
@@ -103,9 +102,9 @@ services:
         condition: service_healthy
     environment:
       PORT: 3003
-      DB_URL: jdbc:postgresql://postgres:5432/auction
-      DB_USER: auction
-      DB_PASSWORD: auction
+      DB_URL: ${DB_URL:-jdbc:postgresql://auction-691.postgres.database.azure.com:5432/auction?sslmode=require}
+      DB_USER: ${DB_USER:-arvind}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in a local .env file}
       USER_SERVICE_BASE_URL: http://user-service:3001
       BID_SERVICE_BASE_URL: http://bid-service:3004
       NOTIFICATION_SERVICE_BASE_URL: http://notification-service:3005
@@ -123,8 +122,6 @@ services:
     image: auction/bid-service:local
     restart: unless-stopped
     depends_on:
-      postgres-init:
-        condition: service_completed_successfully
       redis:
         condition: service_healthy
       user-service:
@@ -135,9 +132,9 @@ services:
         condition: service_healthy
     environment:
       PORT: 3004
-      DB_URL: jdbc:postgresql://postgres:5432/auction
-      DB_USER: auction
-      DB_PASSWORD: auction
+      DB_URL: ${DB_URL:-jdbc:postgresql://auction-691.postgres.database.azure.com:5432/auction?sslmode=require}
+      DB_USER: ${DB_USER:-arvind}
+      DB_PASSWORD: ${DB_PASSWORD:?Set DB_PASSWORD in a local .env file}
       REDIS_HOST: redis
       REDIS_PORT: 6379
       USER_SERVICE_BASE_URL: http://user-service:3001

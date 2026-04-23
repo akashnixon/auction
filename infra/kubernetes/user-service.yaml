@@ -24,13 +24,6 @@ spec:
       securityContext:
         seccompProfile:
           type: RuntimeDefault
-      initContainers:
-        - name: wait-for-postgres
-          image: busybox:1.36
-          command:
-            - sh
-            - -c
-            - until nc -z postgres 5432; do sleep 2; done
       containers:
         - name: user-service
           image: ghcr.io/akashnixon/auction-user-service:deployment

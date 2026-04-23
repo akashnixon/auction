@@ -4,7 +4,7 @@ metadata:
   name: auction-config
   namespace: auction
 data:
-  DB_URL: jdbc:postgresql://postgres:5432/auction
+  DB_URL: jdbc:postgresql://auction-691.postgres.database.azure.com:5432/auction?sslmode=require
   REDIS_HOST: redis
   REDIS_PORT: "6379"
   USER_SERVICE_BASE_URL: http://user-service:3001
@@ -12,7 +12,7 @@ data:
   AUCTION_SERVICE_BASE_URL: http://auction-service:3003
   BID_SERVICE_BASE_URL: http://bid-service:3004
   NOTIFICATION_SERVICE_BASE_URL: http://notification-service:3005
-  APP_CORS_ALLOWED_ORIGINS: https://auction.example.com,http://auction.localtest.me,http://localhost:8080,http://127.0.0.1:8080
+  APP_CORS_ALLOWED_ORIGINS: https://auction.example.com,http://auction.localtest.me,http://20.48.138.29,http://localhost:8080,http://127.0.0.1:8080
   AUCTION_SCHEDULER_ENABLED: "true"
   AUCTION_DURATION_SECONDS: "300"
   FRONTEND_USER_API_URL: /user-api

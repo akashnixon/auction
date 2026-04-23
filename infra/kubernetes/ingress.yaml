@@ -6,8 +6,7 @@ metadata:
 spec:
   ingressClassName: webapprouting.kubernetes.azure.com
   rules:
-    - host: auction.localtest.me
-      http:
+    - http:
         paths:
           - path: /
             pathType: Prefix
@@ -31,8 +30,7 @@ metadata:
 spec:
   ingressClassName: webapprouting.kubernetes.azure.com
   rules:
-    - host: auction.localtest.me
-      http:
+    - http:
         paths:
           - path: /user-api(/|$)(.*)
             pathType: ImplementationSpecific
