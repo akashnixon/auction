@@ -20,7 +20,33 @@ export default function Layout({ user, onLogout, onDeregister, statusMessage }) 
             <header className="topbar">
                 <div className="brand-wrap">
                     <Link to="/" className="brand-mark" aria-label="Auction House home">
-                        AH
+                        <svg
+                            className="brand-logo"
+                            viewBox="0 0 48 48"
+                            role="img"
+                            aria-hidden="true"
+                        >
+                            <path
+                                className="brand-logo-roof"
+                                d="M9 23.5 24 10l15 13.5"
+                                fill="none"
+                            />
+                            <path
+                                className="brand-logo-house"
+                                d="M14 22v15h20V22"
+                                fill="none"
+                            />
+                            <path
+                                className="brand-logo-gavel"
+                                d="M19.5 20.5 28 29m-3.5-12 7 7m-9.5-4 6.5-6.5m1 12.5 7.5 7.5"
+                                fill="none"
+                            />
+                            <path
+                                className="brand-logo-base"
+                                d="M16 38h16"
+                                fill="none"
+                            />
+                        </svg>
                     </Link>
                     <div className="brand-copy">
                         <Link to="/" className="brand">

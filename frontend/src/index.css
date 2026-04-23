@@ -76,15 +76,55 @@ p {
 
 .brand-mark {
   align-items: center;
-  background: #111;
-  border-radius: 14px;
-  color: #fff;
+  background: linear-gradient(145deg, #10131c 0%, #202945 62%, var(--brand) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 16px;
+  box-shadow: 0 10px 24px rgba(41, 71, 242, 0.2);
   display: grid;
-  font-size: 0.95rem;
-  font-weight: 800;
-  height: 42px;
-  letter-spacing: 0.04em;
-  width: 42px;
+  height: 46px;
+  justify-items: center;
+  overflow: hidden;
+  position: relative;
+  width: 46px;
+}
+
+.brand-mark::after {
+  background: radial-gradient(circle at 20% 18%, rgba(255, 255, 255, 0.35), transparent 32%);
+  content: "";
+  inset: 0;
+  pointer-events: none;
+  position: absolute;
+}
+
+.brand-logo {
+  height: 34px;
+  position: relative;
+  width: 34px;
+  z-index: 1;
+}
+
+.brand-logo-roof,
+.brand-logo-house,
+.brand-logo-gavel,
+.brand-logo-base {
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.brand-logo-roof,
+.brand-logo-house {
+  stroke: #ffffff;
+  stroke-width: 3.2;
+}
+
+.brand-logo-gavel {
+  stroke: var(--accent);
+  stroke-width: 3.4;
+}
+
+.brand-logo-base {
+  stroke: rgba(255, 255, 255, 0.78);
+  stroke-width: 2.8;
 }
 
 .brand-copy {
